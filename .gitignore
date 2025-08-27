@@ -136,3 +136,84 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
+
+# ------------------------------
+# Go (server/Go_Edition)
+# ------------------------------
+# Binaries & build artifacts
+*.exe
+*.dll
+*.dylib
+*.test
+*.out
+*.a
+/bin/
+/build/
+coverage.out
+profile*.out
+
+# Go modules/workspaces (optional – keep if you don't use multi-workspace)
+go.work
+go.work.sum
+
+# Vendored dependencies (uncomment if you choose NOT to commit vendor)
+# vendor/
+
+# ------------------------------
+# C# / .NET (server/CSharp_Edition)
+# ------------------------------
+# Build directories
+[Bb]in/
+[Oo]bj/
+[Rr]elease*/
+[Dd]ebug*/
+x64/
+x86/
+[Aa][Rr][Mm]/
+
+# VS / Rider / IDE
+.vs/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.csproj.user
+*.pidb
+*.svclog
+*.aps
+
+# NuGet
+packages/
+*.nupkg
+*.snupkg
+*.nuspec
+project.lock.json
+*.deps.json
+
+# Logs / coverage / test
+TestResult*/
+[Tt]est[Rr]esult*/
+*.coverage
+*.coveragexml
+coverage.json
+BenchmarkDotNet.Artifacts/
+
+# Publish / artifacts
+publish/
+AppPackages/
+
+# Cache / generated
+Generated\ Files/
+*.cache
+*.ide
+
+# Resharper / analyzers
+_ReSharper*/
+*.DotSettings.user
+
+# Optional OS files
+Thumbs.db
+*.orig
+*.rej
+

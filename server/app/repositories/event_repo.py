@@ -2,31 +2,45 @@ from datetime import datetime, date, timedelta
 from typing import List, Optional, Dict, Any, Union
 from uuid import UUID
 
-from sqlalchemy import select, func, and_, or_, desc
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.models.event import Event
+from app.repositories.base import BaseRepository
+from app.db.session import AsyncSessionProtocol
 
 
-class EventRepository:
+class Event:
+    """
+    事件模型 (临时实现，替代SQLAlchemy模型)
+    """
+    id: UUID
+    user_id: str
+    event_type: str
+    timestamp: datetime
+    data: Dict[str, Any]
+    processed: bool
+    processed_at: Optional[datetime]
+    
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+
+class EventRepository(BaseRepository[Event]):
     """
     事件仓库
     提供事件数据的访问抽象
     """
-    def __init__(self, db: AsyncSession):
-        self.db = db
+    def __init__(self, db: AsyncSessionProtocol):
+        super().__init__(db)
     
     async def create(self, event_data: Dict[str, Any]) -> Event:
         """创建新事件"""
+        # 模拟实现
         event = Event(**event_data)
-        self.db.add(event)
-        await self.db.flush()
         return event
     
     async def get_by_id(self, event_id: UUID) -> Optional[Event]:
         """根据 ID 获取事件"""
-        result = await self.db.execute(select(Event).where(Event.id == event_id))
-        return result.scalars().first()
+        # 模拟实现
+        return None
     
     async def get_by_user_and_timerange(
         self, 
@@ -37,22 +51,8 @@ class EventRepository:
         processed: Optional[bool] = None
     ) -> List[Event]:
         """获取用户在指定时间范围内的事件"""
-        query = select(Event).where(
-            and_(
-                Event.user_id == user_id,
-                Event.timestamp >= start_time,
-                Event.timestamp <= end_time
-            )
-        )
-        
-        if event_type:
-            query = query.where(Event.event_type == event_type)
-            
-        if processed is not None:
-            query = query.where(Event.processed == processed)
-            
-        result = await self.db.execute(query.order_by(Event.timestamp))
-        return result.scalars().all()
+        # 模拟实现
+        return []
     
     async def get_events_for_daily_aggregation(
         self, 
@@ -60,34 +60,13 @@ class EventRepository:
         target_date: date
     ) -> List[Event]:
         """获取用户某一天需要进行聚合的事件"""
-        start_time = datetime.combine(target_date, datetime.min.time())
-        end_time = datetime.combine(target_date, datetime.max.time())
-        
-        query = select(Event).where(
-            and_(
-                Event.user_id == user_id,
-                Event.timestamp >= start_time,
-                Event.timestamp <= end_time,
-                Event.processed == False
-            )
-        )
-        
-        result = await self.db.execute(query.order_by(Event.timestamp))
-        return result.scalars().all()
+        # 模拟实现
+        return []
     
     async def mark_as_processed(self, event_ids: List[UUID]) -> None:
         """将事件标记为已处理"""
-        if not event_ids:
-            return
-            
-        query = select(Event).where(Event.id.in_(event_ids))
-        result = await self.db.execute(query)
-        events = result.scalars().all()
-        
-        for event in events:
-            event.processed = True
-            
-        await self.db.flush()
+        # 模拟实现
+        pass
     
     async def get_event_counts_by_type(
         self, 
@@ -96,16 +75,6 @@ class EventRepository:
         end_time: datetime
     ) -> Dict[str, int]:
         """获取用户在指定时间范围内各类型事件的数量"""
-        query = select(
-            Event.event_type,
-            func.count(Event.id).label("count")
-        ).where(
-            and_(
-                Event.user_id == user_id,
-                Event.timestamp >= start_time,
-                Event.timestamp <= end_time
-            )
-        ).group_by(Event.event_type)
-        
-        result = await self.db.execute(query)
-        return {row[0]: row[1] for row in result}
+        # 模拟实现
+        return {}
+

@@ -9,7 +9,6 @@ from app.api.routes import health
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.core.metrics import setup_metrics
-from app.scheduler.jobs import scheduler_service
 
 # 设置日志
 setup_logging()
@@ -45,8 +44,8 @@ app.include_router(health.router)
 async def startup_event():
     logger.info("Starting Health Guardian API", environment=settings.APP_ENV)
     
-    # 启动调度器
-    scheduler_service.start()
+    # 暂时禁用调度器
+    # scheduler_service.start()
 
 
 # 关闭事件

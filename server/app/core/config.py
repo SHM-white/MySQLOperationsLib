@@ -16,8 +16,9 @@ class Settings(BaseSettings):
     API_PORT: int = Field(8080, description="API 服务端口")
     DEBUG: bool = Field(False, description="调试模式")
     
-    # 数据库配置
-    DATABASE_URL: str = Field(..., description="PostgreSQL 连接 URL")
+    # 数据库配置 - 仅作为接口保留，暂不实际使用
+    DATABASE_URL: str = Field("sqlite+aiosqlite:///./mock.db", description="数据库连接URL")
+    DISABLE_DB: bool = Field(True, description="是否禁用数据库连接")
     
     # Redis 配置
     REDIS_URL: Optional[str] = Field(None, description="Redis 连接 URL")

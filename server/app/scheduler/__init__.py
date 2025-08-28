@@ -1,7 +1,7 @@
 # 调度器模块初始化文件
-from app.scheduler.jobs import SchedulerService, scheduler_service
+# 直接从jobs模块导出调度器服务
+from app.scheduler.jobs import scheduler_service
 
 __all__ = [
-    "SchedulerService",
     "scheduler_service"
 ]

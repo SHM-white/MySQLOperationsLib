@@ -1,6 +1,6 @@
 from typing import Annotated, Dict, Any, Optional
 
-from fastapi import Depends, HTTPException, status, Query, Header
+from fastapi import Depends, HTTPException, status, Query, Header, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -23,7 +23,7 @@ async def verify_signature(
     timestamp: str = Header(...),
     sign: str = Header(...),
     verifier: SecurityVerifier = Depends(get_security_verifier),
-    request = None
+    request: Request = Depends(Request)
 ):
     """
     验证请求签名

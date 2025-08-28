@@ -1,13 +1,14 @@
-from datetime import datetime
+from datetime import datetime, timedelta, timezone  # 添加 timedelta 和 timezone 导入
 from typing import List, Dict, Any, Optional
 
 from fastapi import APIRouter, Depends, Query, Path, Body
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator  # 替换 validator 为 field_validator
 
 from app.api.deps import DB, get_event_repo
 from app.api.response_models import DataResponse, PaginatedResponse, EventResponse
 from app.api.errors import NotFoundError
 from app.repositories.event_repo import EventRepository
+from uuid import UUID
 
 router = APIRouter(prefix="/events", tags=["事件"])
 
@@ -21,7 +22,7 @@ class EventCreate(BaseModel):
     source: str = Field(..., description="事件来源")
     data: Dict[str, Any] = Field(..., description="事件数据")
     
-    @validator("event_type")
+    @field_validator("event_type")
     def validate_event_type(cls, v):
         """验证事件类型"""
         allowed_types = ["WORK", "BREAK", "WATER", "POSTURE", "ENVIRONMENT"]
@@ -29,7 +30,7 @@ class EventCreate(BaseModel):
             raise ValueError(f"Event type must be one of {', '.join(allowed_types)}")
         return v
     
-    @validator("source")
+    @field_validator("source")
     def validate_source(cls, v):
         """验证事件来源"""
         allowed_sources = ["desktop", "iot", "manual"]
@@ -51,10 +52,10 @@ async def create_event(
     """
     # 设置默认时间戳
     if not event.timestamp:
-        event.timestamp = datetime.utcnow()
+        event.timestamp = datetime.now(timezone.utc)
     
     # 创建事件
-    created_event = await event_repo.create(event.dict())
+    created_event = await event_repo.create(event.model_dump())
     
     return {
         "status": "success",
@@ -74,7 +75,7 @@ async def get_event(
     
     通过ID获取事件详情
     """
-    event = await event_repo.get_by_id(event_id)
+    event = await event_repo.get_by_id(UUID(event_id))
     
     if not event:
         raise NotFoundError(message="Event not found", detail={"event_id": event_id})
@@ -101,11 +102,11 @@ async def get_user_events(
     
     获取用户在指定时间范围内的事件列表
     """
-    # 设置默认时间范围
-    if not start_time:
-        start_time = datetime.utcnow() - datetime.timedelta(days=7)
-    
-    if not end_time:
+    # 确保 start_time 和 end_time 是 datetime 类型
+    if not isinstance(start_time, datetime):
+        start_time = datetime.utcnow() - timedelta(days=7)
+
+    if not isinstance(end_time, datetime):
         end_time = datetime.utcnow()
     
     # 获取事件列表

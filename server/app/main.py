@@ -1,4 +1,5 @@
 import logging
+from contextlib import asynccontextmanager
 
 import structlog
 from fastapi import FastAPI, Request, Depends
@@ -14,6 +15,16 @@ from app.core.metrics import setup_metrics
 setup_logging()
 logger = structlog.get_logger(__name__)
 
+# 使用 lifespan 事件替代 @app.on_event
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Starting Health Guardian API", environment=settings.APP_ENV)
+    # 暂时禁用调度器
+    # scheduler_service.start()
+    yield
+    logger.info("Shutting down Health Guardian API")
+
+
 # 创建 FastAPI 应用
 app = FastAPI(
     title="Health Guardian API",
@@ -21,6 +32,7 @@ app = FastAPI(
     version="0.1.0",
     docs_url="/docs" if not settings.is_production else None,
     redoc_url="/redoc" if not settings.is_production else None,
+    lifespan=lifespan,
 )
 
 # 添加 CORS 中间件
@@ -37,21 +49,6 @@ setup_metrics(app)
 
 # 注册路由
 app.include_router(health.router)
-
-
-# 启动事件
-@app.on_event("startup")
-async def startup_event():
-    logger.info("Starting Health Guardian API", environment=settings.APP_ENV)
-    
-    # 暂时禁用调度器
-    # scheduler_service.start()
-
-
-# 关闭事件
-@app.on_event("shutdown")
-async def shutdown_event():
-    logger.info("Shutting down Health Guardian API")
 
 
 # 全局异常处理

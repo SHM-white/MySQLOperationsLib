@@ -1,8 +1,8 @@
 from datetime import datetime, date, timedelta
-from typing import Dict, List, Any, Optional, Tuple
-
+from typing import Dict, List, Any, Optional, Tuple, Sequence  
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
+from uuid import UUID
 
 from app.repositories.event_repo import EventRepository
 from app.models.event import Event, DailyMetrics
@@ -56,6 +56,7 @@ class AggregationService:
             "continuous_max_min": 0,  # 最长连续工作时长(分钟)
             "water_intake_ml": 0,     # 饮水量(毫升)
             "water_target_ml": 1500,  # 饮水目标(毫升)，默认值
+            "water_progress": 0.0,      # 饮水进度
             "break_count": 0,         # 休息次数
             "posture_alerts": 0,      # 姿势提醒次数
             "events_count": len(events)  # 总事件数
@@ -82,12 +83,40 @@ class AggregationService:
         metrics.update(env_metrics)
         
         # 标记事件为已处理
-        event_ids = [event.id for event in events]
-        await self.event_repo.mark_as_processed(event_ids)
-        
+        # 确保 event_ids 是 UUID 类型的列表
+        event_ids = [event.id for event in events if isinstance(event.id, UUID)]
+
+        # 修复排序问题，提取实际的 timestamp 值
+        work_events = events_by_type.get("WORK", [])
+        work_events = [event for event in work_events if isinstance(event.timestamp, datetime)]
+        work_events.sort(key=lambda e: e.timestamp if isinstance(e.timestamp, datetime) else datetime.min)
+
+        # 修复 last_timestamp 的类型问题，显式提取值
+        last_timestamp: datetime | None = None
+        current_continuous = 0
+        for event in work_events:
+            if isinstance(event.timestamp, datetime):
+                event_timestamp = event.timestamp
+                if last_timestamp and isinstance(last_timestamp, datetime):
+                    time_diff = (event_timestamp - last_timestamp).total_seconds()
+                    if time_diff < 300:  # 5分钟内
+                        current_continuous += event.data.get("duration_min", 0)
+                    else:
+                        current_continuous = event.data.get("duration_min", 0)
+                else:
+                    current_continuous = event.data.get("duration_min", 0)
+                last_timestamp = event_timestamp
+
+        # 修复排序问题，提取实际的 timestamp 值
+        work_events.sort(key=lambda e: e.timestamp if isinstance(e.timestamp, datetime) else datetime.min)
+        env_events.sort(key=lambda e: e.timestamp if isinstance(e.timestamp, datetime) else datetime.min, reverse=True)
+
+        # 修复 water_progress 的类型问题
+        metrics["water_progress"] = round(progress * 100)
+
         return metrics
     
-    def _group_events_by_type(self, events: List[Event]) -> Dict[str, List[Event]]:
+    def _group_events_by_type(self, events: Sequence[Event]) -> Dict[str, List[Event]]:
         """
         按事件类型分组
         
@@ -186,7 +215,7 @@ class AggregationService:
         progress = min(1.0, total_ml / target_ml) if target_ml > 0 else 0
         
         metrics["water_target_ml"] = target_ml
-        metrics["water_progress"] = round(progress, 2)
+        metrics["water_progress"] = round(progress, 2) if isinstance(progress, float) else float(progress)
         
         return metrics
     

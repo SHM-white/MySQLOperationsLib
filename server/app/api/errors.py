@@ -3,7 +3,7 @@ from typing import Dict, Any, Optional, List, Union, Type
 from fastapi import Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from pydantic import ValidationError
+from pydantic import ValidationError as PydanticValidationError
 
 import structlog
 
@@ -145,11 +145,11 @@ def add_exception_handlers(app):
         )
     
     # 处理 Pydantic 验证异常
-    @app.exception_handler(ValidationError)
-    async def pydantic_validation_exception_handler(request: Request, exc: ValidationError):
+    @app.exception_handler(PydanticValidationError)
+    async def pydantic_validation_exception_handler(request: Request, exc: PydanticValidationError):
         logger.warning(
             "Pydantic validation error", 
-            errors=exc.errors(), 
+            errors=getattr(exc, 'errors', None),  # 使用 getattr 以防止属性不存在
             path=request.url.path
         )
         
@@ -158,6 +158,6 @@ def add_exception_handlers(app):
             content={
                 "status": "error",
                 "message": "Validation error",
-                "detail": exc.errors()
+                "detail": getattr(exc, 'errors', None)  # 使用 getattr 获取属性
             }
         )

@@ -4,23 +4,7 @@ from uuid import UUID
 
 from app.repositories.base import BaseRepository
 from app.db.session import AsyncSessionProtocol
-
-
-class Event:
-    """
-    事件模型 (临时实现，替代SQLAlchemy模型)
-    """
-    id: UUID
-    user_id: str
-    event_type: str
-    timestamp: datetime
-    data: Dict[str, Any]
-    processed: bool
-    processed_at: Optional[datetime]
-    
-    def __init__(self, **kwargs):
-        for key, value in kwargs.items():
-            setattr(self, key, value)
+from app.models.event import Event  # 替换本地定义的 Event
 
 
 class EventRepository(BaseRepository[Event]):

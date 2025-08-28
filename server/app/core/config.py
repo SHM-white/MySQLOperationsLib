@@ -1,6 +1,6 @@
 from typing import Optional, Dict, Any, List
 import os
-from pydantic import Field, field_validator
+from pydantic import ConfigDict, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -62,7 +62,8 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         """是否为生产环境"""
         return self.APP_ENV == "prod"
-
+    def __init__(self):
+        super().__init__()
 
 # 创建全局配置单例
-settings = Settings()
+settings: Settings = Settings()

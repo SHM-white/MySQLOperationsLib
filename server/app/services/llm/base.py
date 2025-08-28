@@ -85,7 +85,7 @@ class BaseLLMClient(ABC):
         """
         # 确保第一条消息是系统消息
         if not messages or messages[0]["role"] != "system":
-            system_message = {
+            system_message: ChatMessage = {
                 "role": "system",
                 "content": "你是办公健康助手，只能使用提供的事实，禁止医学诊断。"
             }

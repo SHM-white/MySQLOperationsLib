@@ -57,9 +57,3 @@ class RuleRepository(BaseRepository[Rule]):
         """删除规则"""
         # 模拟实现
         return True
-        if not rule:
-            return False
-            
-        await self.db.delete(rule)
-        await self.db.flush()
-        return True

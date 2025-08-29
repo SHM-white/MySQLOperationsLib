@@ -16,8 +16,8 @@ namespace RepositoriesCore
         string[]? ReadRecords(string[] UUIDs);
         bool DeleteRecords(string[] UUIDs);
         string[]? SearchRecordsByUserId(string userId);
-        bool DatabaseIsInitialized((string type, string name)[] properties);
-        bool InitializeDatabase();
+        bool DatabaseIsInitialized();
+        bool InitializeDatabase(Dictionary<string, string> properties);
         static bool IsValidConnectionString(string connectionString)
         {
             try

@@ -86,7 +86,7 @@ namespace RepositoriesCore
             }
         }
 
-        public abstract bool InitializeDatabase();
+        public abstract bool InitializeDatabase(Dictionary<string, string> properties);
 
         public virtual bool IsConnected()
         {
@@ -103,6 +103,6 @@ namespace RepositoriesCore
 
         public abstract bool DeleteRecords(string[] UUIDs);
 
-        public abstract bool DatabaseIsInitialized((string type, string name)[] properties);
+        public abstract bool DatabaseIsInitialized();
     }
 }

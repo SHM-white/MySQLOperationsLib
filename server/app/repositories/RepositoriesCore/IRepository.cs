@@ -4,23 +4,36 @@ namespace RepositoriesCore
 {
     public interface IRepository
     {
-        string ConnectionString
+        string ConnectionString { get; set; }
+        bool IsConnected();
+        bool Connect(string ConnectionString);
+        bool Connect();
+        void Disconnect();
+        void Dispose();
+        IRepository Clone();
+        bool CreateRecords(string[] records);
+        bool UpdateRecord(string UUID, string record);
+        string[]? ReadRecords(string[] UUIDs);
+        bool DeleteRecords(string[] UUIDs);
+        string[]? SearchRecordsByUserId(string userId);
+        bool DatabaseIsInitialized((string type, string name)[] properties);
+        bool InitializeDatabase();
+        static bool IsValidConnectionString(string connectionString)
         {
-            get; set;
+            try
+            {
+                var builder = new SqlConnectionStringBuilder(connectionString);
+                return !string.IsNullOrWhiteSpace(builder.DataSource) &&
+                       !string.IsNullOrWhiteSpace(builder.InitialCatalog) &&
+                       !string.IsNullOrWhiteSpace(builder.UserID) &&
+                       !string.IsNullOrWhiteSpace(builder.Password);
+            }
+            catch
+            {
+                return false;
+            }
         }
-        public abstract bool IsConnected();
-        public abstract bool Connect(string ConnectionString);
-        public abstract void Disconnect();
-        public abstract void Dispose();
-        public abstract IRepository Clone();
-        public abstract bool CreateRecords(string[] records);
-        public abstract bool UpdateRecord(string UUID, string record);
-        public abstract string[]? ReadRecords(string[] UUIDs);
-        public abstract bool DeleteRecords(string[] UUIDs);
-        public abstract string[]? SearchRecordsByUserId(string userId);
-        public abstract bool DatabaseIsInitialized((string type, string name)[] properties);
-        public abstract bool InitializeDatabase();
-        public static string GenerateConnectionString(string server, string database, string userId, string password)
+        static string GenerateConnectionString(string server, string database, string userId, string password)
         {
             var builder = new SqlConnectionStringBuilder
             {

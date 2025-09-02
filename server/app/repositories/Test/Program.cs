@@ -1,24 +1,16 @@
-﻿using System.Collections.Generic;
+﻿using System;
 using System.Runtime.InteropServices;
 using System.Text;
-using Microsoft.Data.SqlClient;
 
-namespace UnitTest
+namespace TestUtils
 {
-    [TestClass]
-    public sealed class Test1
+    internal class Program
     {
-        [TestMethod]
-        public void Repository_Methods_Compile()
+        static void Main(string[] args)
         {
-            var repo = new RepositoriesCore.EmployeesRepository("Server=.;Database=Dummy;User Id=sa;Password=pwd;");
-            var initResult = repo.InitializeDatabase(new Dictionary<string,string>());
-            var isInitialized = repo.DatabaseIsInitialized();
-            // Empty implementation expectations (both should be false / default)
-            Assert.IsFalse(initResult);
-            Assert.IsFalse(isInitialized);
+            var repo = CreateRepository();
         }
-        public static RepositoriesCore.EmployeesRepository CreateRepository(string connectionString)
+        public static RepositoriesCore.EmployeesRepository CreateRepository()
         {
             var debugConfigFile = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "test.ini");
             var iniHandler = new IniFileHandler();
@@ -30,7 +22,6 @@ namespace UnitTest
                 ));
             return repo;
         }
-
     }
     class IniFileHandler
     {

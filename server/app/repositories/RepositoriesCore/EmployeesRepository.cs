@@ -9,20 +9,8 @@ namespace RepositoriesCore
     // Simple in-memory implementation placeholder (empty implementations)
     public class EmployeesRepository : RepositoryManagerBase
     {
-        public EmployeesRepository(string? connectionString) : base(connectionString)
+        public EmployeesRepository(string? connectionString) : base(connectionString, "Employees")
         {
-        }
-
-        public override bool InitializeDatabase(Dictionary<string, string> properties)
-        {
-            // empty implementation
-            return false;
-        }
-
-        public override bool DatabaseIsInitialized()
-        {
-            // empty implementation
-            return false;
         }
 
         public override bool CreateRecords(string[] records)

@@ -5,6 +5,8 @@ namespace RepositoriesCore
     public interface IRepository
     {
         string ConnectionString { get; set; }
+        string SheetName { get; }
+        Dictionary<string, string> Properties { get; set; }
         bool IsConnected();
         bool Connect(string ConnectionString);
         bool Connect();

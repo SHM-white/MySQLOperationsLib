@@ -10,9 +10,10 @@ namespace RepositoriesCore
 {
     public abstract class RepositoryManagerBase : IRepository, IDisposable
     {
-        protected RepositoryManagerBase(string? connectionString)
+        protected RepositoryManagerBase(string? connectionString, string sheetName)
         {
             _connectionString = connectionString ?? string.Empty;
+            _sheetName = sheetName;
             Connect();
         }
         ~RepositoryManagerBase()
@@ -32,6 +33,13 @@ namespace RepositoriesCore
         }
         protected MySqlConnection? _connection;
         protected MySqlConnection? Connection => _connection;
+        protected string _sheetName;
+        public string SheetName => _sheetName;
+        protected Dictionary<string, string> _properties = new Dictionary<string, string>();
+        public Dictionary<string, string> Properties { 
+            get => _properties; 
+            set => _properties = value; 
+        }
         public virtual IRepository Clone()
         {
             return (IRepository)MemberwiseClone();
@@ -86,7 +94,11 @@ namespace RepositoriesCore
             }
         }
 
-        public abstract bool InitializeDatabase(Dictionary<string, string> properties);
+        public virtual bool InitializeDatabase(Dictionary<string, string> properties)
+        {
+
+            return true;
+        }
 
         public virtual bool IsConnected()
         {
@@ -103,7 +115,36 @@ namespace RepositoriesCore
 
         public abstract bool DeleteRecords(string[] UUIDs);
 
-        public abstract bool DatabaseIsInitialized();
+        public virtual bool DatabaseIsInitialized()
+        {
+            // 校验基础参数
+            if (string.IsNullOrWhiteSpace(_sheetName))
+                throw new InvalidOperationException("SheetName is not set.");
+
+            // 若尚未连接则尝试连接（避免调用方忘记先 Connect）
+            if (!IsConnected())
+            {
+                Connect();
+            }
+            if (!IsConnected())
+                throw new InvalidOperationException("Not connected to the database.");
+
+            // 使用 INFORMATION_SCHEMA 精确判断，避免 LIKE 误判及特殊字符问题
+            const string sql = @"SELECT 1 FROM INFORMATION_SCHEMA.TABLES 
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = @table LIMIT 1;";
+            try
+            {
+                using var cmd = new MySqlCommand(sql, _connection);
+                cmd.Parameters.AddWithValue("@table", _sheetName);
+                var result = cmd.ExecuteScalar();
+                return result is not null; // 有行即存在
+            }
+            catch (MySqlException ex)
+            {
+                throw new InvalidOperationException($"Failed to check table existence for '{_sheetName}'. MySQL error {ex.Number}: {ex.Message}", ex);
+            }
+        }
+
         public virtual string ExecuteCommand(string commandText)
         {
             if (!IsConnected())

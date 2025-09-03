@@ -9,15 +9,18 @@ namespace TestUtils
         static void Main(string[] args)
         {
             var repo = CreateRepository();
+            Console.WriteLine($"IsInitialized: {repo.DatabaseIsInitialized()}");
+            Console.WriteLine($"Type 'exit' to quit.");
             while (true)
             {
+                Console.Write(">");
                 var input = Console.ReadLine();
                 if (string.IsNullOrEmpty(input)) continue;
                 if (input.Equals("exit", StringComparison.OrdinalIgnoreCase)) break;
                 try
                 {
                     var output = repo.ExecuteCommand(input);
-                    Console.WriteLine(output);
+                    Console.WriteLine($"{output}");
                 }
                 catch (Exception ex)
                 {

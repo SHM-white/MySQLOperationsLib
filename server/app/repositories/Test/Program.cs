@@ -9,6 +9,21 @@ namespace TestUtils
         static void Main(string[] args)
         {
             var repo = CreateRepository();
+            while (true)
+            {
+                var input = Console.ReadLine();
+                if (string.IsNullOrEmpty(input)) continue;
+                if (input.Equals("exit", StringComparison.OrdinalIgnoreCase)) break;
+                try
+                {
+                    var output = repo.ExecuteCommand(input);
+                    Console.WriteLine(output);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error: {ex.Message}");
+                }
+            }
         }
         public static RepositoriesCore.EmployeesRepository CreateRepository()
         {

@@ -1,4 +1,4 @@
-﻿using Microsoft.Data.SqlClient;
+﻿using MySqlConnector;
 
 namespace RepositoriesCore
 {
@@ -18,13 +18,14 @@ namespace RepositoriesCore
         string[]? SearchRecordsByUserId(string userId);
         bool DatabaseIsInitialized();
         bool InitializeDatabase(Dictionary<string, string> properties);
+        string ExecuteCommand(string commandText);
         static bool IsValidConnectionString(string connectionString)
         {
             try
             {
-                var builder = new SqlConnectionStringBuilder(connectionString);
-                return !string.IsNullOrWhiteSpace(builder.DataSource) &&
-                       !string.IsNullOrWhiteSpace(builder.InitialCatalog) &&
+                var builder = new MySqlConnectionStringBuilder(connectionString);
+                return !string.IsNullOrWhiteSpace(builder.Server) &&
+                       !string.IsNullOrWhiteSpace(builder.Database) &&
                        !string.IsNullOrWhiteSpace(builder.UserID) &&
                        !string.IsNullOrWhiteSpace(builder.Password);
             }
@@ -35,16 +36,12 @@ namespace RepositoriesCore
         }
         static string GenerateConnectionString(string server, string database, string userId, string password)
         {
-            var builder = new SqlConnectionStringBuilder
+            var builder = new MySqlConnectionStringBuilder
             {
-                DataSource = server,
-                InitialCatalog = database,
+                Server = server,
+                Database = database,
                 UserID = userId,
-                Password = password,
-                Encrypt = true,
-                TrustServerCertificate = true,
-                ConnectTimeout = 30,
-                MultipleActiveResultSets = true
+                Password = password
             };
             return builder.ConnectionString;
         }

@@ -1,11 +1,11 @@
 ﻿using Microsoft.Identity.Client;
+using MySqlConnector;
+using RepositoriesCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using RepositoriesCore;
-using Microsoft.Data.SqlClient;
 namespace RepositoriesCore
 {
     public abstract class RepositoryManagerBase : IRepository, IDisposable
@@ -30,8 +30,8 @@ namespace RepositoriesCore
                 else throw new ArgumentException($"Connection string is illegal: {value}");
             }
         }
-        protected SqlConnection? _connection;
-        protected SqlConnection? Connection => _connection;
+        protected MySqlConnection? _connection;
+        protected MySqlConnection? Connection => _connection;
         public virtual IRepository Clone()
         {
             return (IRepository)MemberwiseClone();
@@ -46,7 +46,7 @@ namespace RepositoriesCore
         {
             if (_connection is null && !string.IsNullOrEmpty(ConnectionString))
             {
-                _connection = new SqlConnection(ConnectionString);
+                _connection = new MySqlConnection(ConnectionString);
                 _connection.Open();
                 return true;
             }
@@ -104,5 +104,17 @@ namespace RepositoriesCore
         public abstract bool DeleteRecords(string[] UUIDs);
 
         public abstract bool DatabaseIsInitialized();
+        public virtual string ExecuteCommand(string commandText)
+        {
+            if (!IsConnected())
+            {
+                throw new InvalidOperationException("Not connected to the database.");
+            }
+            using (var command = new MySqlCommand(commandText, _connection))
+            {
+                var result = command.ExecuteScalar();
+                return result?.ToString() ?? string.Empty;
+            }
+        }
     }
 }

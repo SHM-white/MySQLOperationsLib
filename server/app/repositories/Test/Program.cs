@@ -9,11 +9,15 @@ namespace TestUtils
         static void Main(string[] args)
         {
             var repo = CreateRepository();
-            Console.WriteLine($"IsInitialized: {repo.DatabaseIsInitialized()}");
+            Console.WriteLine($"Repo1 is connected: {repo.IsConnected()}");
+            Console.WriteLine($"Repo1 IsInitialized: {repo.DatabaseIsInitialized()}");
+            var repo2 = CreateRepository();
+            Console.WriteLine($"Repo2 is connected: {repo2.IsConnected()}");
+            Console.WriteLine($"Repo2 IsInitialized: {repo2.DatabaseIsInitialized()}");
             Console.WriteLine($"Type 'exit' to quit.");
             while (true)
             {
-                Console.Write(">");
+                Console.Write("Repo1>");
                 var input = Console.ReadLine();
                 if (string.IsNullOrEmpty(input)) continue;
                 if (input.Equals("exit", StringComparison.OrdinalIgnoreCase)) break;

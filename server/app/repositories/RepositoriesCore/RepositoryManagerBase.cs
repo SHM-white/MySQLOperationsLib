@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 namespace RepositoriesCore
 {
@@ -32,14 +33,9 @@ namespace RepositoriesCore
             }
         }
         protected MySqlConnection? _connection;
-        protected MySqlConnection? Connection => _connection;
+        protected MySqlConnection? Connection => _connection; // 连接实例不暴露给外部
         protected string _sheetName;
         public string SheetName => _sheetName;
-        protected Dictionary<string, string> _properties = new Dictionary<string, string>();
-        public Dictionary<string, string> Properties { 
-            get => _properties; 
-            set => _properties = value; 
-        }
         public virtual IRepository Clone()
         {
             return (IRepository)MemberwiseClone();
@@ -74,7 +70,6 @@ namespace RepositoriesCore
                 _connection = null;
             }
         }
-        // Dispose pattern
         public void Dispose()
         {
             Dispose(true);
@@ -84,22 +79,88 @@ namespace RepositoriesCore
         {
             if (disposing)
             {
-                // managed
                 Disconnect();
             }
             else
             {
-                // finalizer path
                 try { Disconnect(); } catch { }
             }
         }
 
-        public virtual bool InitializeDatabase(Dictionary<string, string> properties)
+        // 新增：基于列定义动态建表
+        public virtual bool InitializeDatabase(IEnumerable<ColumnDefinition> columns)
         {
+            if (columns is null) throw new ArgumentNullException(nameof(columns));
+            var cols = columns.ToList();
+            if (!cols.Any()) throw new ArgumentException("No column definitions provided.");
+            if (!IsConnected()) Connect();
+            if (!IsConnected()) throw new InvalidOperationException("Not connected to the database.");
 
+            if (string.IsNullOrEmpty(_sheetName))
+                throw new ArgumentException($"Invalid table name: {_sheetName}");
+
+            for (int i = 0; i < cols.Count; i++)
+            {
+                var c = cols[i];
+                if (!c.Name.IsValidIdentifier())
+                    throw new ArgumentException($"Invalid column name: {c.Name}");
+                // 自动主键推断：如果没有主键且列名为 UUID
+            }
+            if (!cols.Any(c => c.IsPrimaryKey))
+            {
+                var uuid = cols.FirstOrDefault(c => string.Equals(c.Name, "UUID", StringComparison.OrdinalIgnoreCase));
+                if (uuid is not null)
+                {
+                    cols[cols.IndexOf(uuid)] = uuid with { IsPrimaryKey = true, IsNullable = false };
+                }
+                else
+                {
+                    // 插入一个自增主键列
+                    cols.Insert(0, new ColumnDefinition("Id", DbColumnType.Int64, IsPrimaryKey: true, IsNullable: false, AutoIncrement: true));
+                }
+            }
+
+            // 生成列定义
+            var columnSqlParts = new List<string>();
+            var primaryKeys = cols.Where(c => c.IsPrimaryKey).ToList();
+            var uniqueKeys = new List<string>();
+            var indexes = new List<string>();
+
+            foreach (var c in cols)
+            {
+                var type = c.ToMySqlType();
+                var nullStr = c.IsNullable && !c.IsPrimaryKey ? "NULL" : "NOT NULL";
+                var autoInc = c.AutoIncrement ? " AUTO_INCREMENT" : string.Empty;
+                var defaultExpr = !string.IsNullOrWhiteSpace(c.DefaultValue) ? $" DEFAULT {c.DefaultValue}" : string.Empty;
+                var comment = !string.IsNullOrWhiteSpace(c.Comment) ? $" COMMENT '{c.Comment.Replace("'", "''")}'" : string.Empty;
+                columnSqlParts.Add($"`{c.Name}` {type} {nullStr}{autoInc}{defaultExpr}{comment}".Trim());
+                if (c.IsUnique && !c.IsPrimaryKey)
+                {
+                    uniqueKeys.Add($"UNIQUE KEY `UK_{_sheetName}_{c.Name}` (`{c.Name}`)");
+                }
+                if (c.IsIndexed && !c.IsPrimaryKey && !c.IsUnique)
+                {
+                    indexes.Add($"KEY `IDX_{_sheetName}_{c.Name}` (`{c.Name}`)");
+                }
+            }
+
+            string pkClause = primaryKeys.Count == 1
+                ? $"PRIMARY KEY (`{primaryKeys[0].Name}`)"
+                : $"PRIMARY KEY ({string.Join(",", primaryKeys.Select(p => $"`{p.Name}`"))})";
+
+            var allConstraints = new List<string> { pkClause };
+            allConstraints.AddRange(uniqueKeys);
+            allConstraints.AddRange(indexes);
+
+            string createTableSql = $@"CREATE TABLE IF NOT EXISTS `{_sheetName}` (
+{string.Join(",\n", columnSqlParts)},
+{string.Join(",\n", allConstraints)}
+) DEFAULT CHARSET=utf8mb4;";
+
+            using var cmd = new MySqlCommand(createTableSql, _connection);
+            cmd.ExecuteNonQuery();
             return true;
         }
-
         public virtual bool IsConnected()
         {
             return _connection is not null && _connection.State == System.Data.ConnectionState.Open;

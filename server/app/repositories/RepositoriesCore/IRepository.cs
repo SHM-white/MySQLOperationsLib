@@ -6,7 +6,6 @@ namespace RepositoriesCore
     {
         string ConnectionString { get; set; }
         string SheetName { get; }
-        Dictionary<string, string> Properties { get; set; }
         bool IsConnected();
         bool Connect(string ConnectionString);
         bool Connect();
@@ -19,8 +18,7 @@ namespace RepositoriesCore
         bool DeleteRecords(string[] UUIDs);
         string[]? SearchRecordsByUserId(string userId);
         bool DatabaseIsInitialized();
-        bool InitializeDatabase(Dictionary<string, string> properties);
-        string ExecuteCommand(string commandText);
+        bool InitializeDatabase(IEnumerable<ColumnDefinition> columns);
         static bool IsValidConnectionString(string connectionString)
         {
             try

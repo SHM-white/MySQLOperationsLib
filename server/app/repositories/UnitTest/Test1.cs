@@ -2,6 +2,7 @@
 using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Data.SqlClient;
+using RepositoriesCore;
 
 namespace UnitTest
 {
@@ -12,7 +13,8 @@ namespace UnitTest
         public void Repository_Methods_Compile()
         {
             var repo = new RepositoriesCore.EmployeesRepository("Server=localhost;Database=Dummy;User Id=user;Password=pwd;");
-            var initResult = repo.InitializeDatabase(new List<string>{"UserId","Record"});
+
+            var initResult = repo.InitializeDatabase(repo.DatabaseDefinition);
             var isInitialized = repo.DatabaseIsInitialized();
             // 对于空实现 / 或尚未真正连接的情况，只验证方法调用流程
             Assert.IsTrue(initResult); // 动态建表返回 true

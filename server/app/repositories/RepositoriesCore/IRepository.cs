@@ -1,4 +1,5 @@
 ﻿using MySqlConnector;
+using System.Threading.Tasks;
 
 namespace RepositoriesCore
 {
@@ -9,6 +10,9 @@ namespace RepositoriesCore
         bool IsConnected();
         bool Connect(string ConnectionString);
         bool Connect();
+        Task<bool> ConnectAsync(string connectionString);
+        Task<bool> ConnectAsync();
+        Task<bool> TryConnectAsync();
         void Disconnect();
         void Dispose();
         IRepository Clone();

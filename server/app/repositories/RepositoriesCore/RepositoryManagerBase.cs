@@ -11,6 +11,7 @@ namespace RepositoriesCore
 {
     public abstract class RepositoryManagerBase : IRepository, IDisposable
     {
+        public abstract List<ColumnDefinition> DatabaseDefinition { get; }
         protected RepositoryManagerBase(string? connectionString, string sheetName)
         {
             _connectionString = connectionString ?? string.Empty;
@@ -48,19 +49,44 @@ namespace RepositoriesCore
         }
         public virtual bool Connect()
         {
-            if (_connection is null && !string.IsNullOrEmpty(ConnectionString))
+            if (string.IsNullOrEmpty(ConnectionString))
+            {
+                return false;
+            }
+            if (_connection is null)
             {
                 _connection = new MySqlConnection(ConnectionString);
-                _connection.Open();
-                return true;
             }
-            else if (_connection is not null && _connection.State != System.Data.ConnectionState.Open)
+            if (_connection is not null && _connection.State != System.Data.ConnectionState.Open)
             {
                 _connection.Open();
-                return true;
             }
-            return false;
+            return _connection is not null && _connection.State == System.Data.ConnectionState.Open;
         }
+
+        public virtual async Task<bool> ConnectAsync(string connectionString)
+        {
+            this.ConnectionString = connectionString;
+            return await ConnectAsync();
+        }
+
+        public virtual async Task<bool> ConnectAsync()
+        {
+            if (string.IsNullOrEmpty(ConnectionString))
+            {
+                return false;
+            }
+            if (_connection is null)
+            {
+                _connection = new MySqlConnection(ConnectionString);
+            }
+            if (_connection is not null && _connection.State != System.Data.ConnectionState.Open)
+            {
+                await _connection.OpenAsync();
+            }
+            return _connection is not null && _connection.State == System.Data.ConnectionState.Open;
+        }
+
         public virtual void Disconnect()
         {
             if (_connection is not null)
@@ -217,6 +243,15 @@ namespace RepositoriesCore
                 var result = command.ExecuteScalar();
                 return result?.ToString() ?? string.Empty;
             }
+        }
+
+        public virtual async Task<bool> TryConnectAsync()
+        {
+            if (!IsConnected())
+            {
+                return await ConnectAsync();
+            }
+            return IsConnected();
         }
     }
 }

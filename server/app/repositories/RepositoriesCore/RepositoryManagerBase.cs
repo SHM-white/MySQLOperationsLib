@@ -95,8 +95,7 @@ namespace RepositoriesCore
             if (columns is null) throw new ArgumentNullException(nameof(columns));
             var cols = columns.ToList();
             if (!cols.Any()) throw new ArgumentException("No column definitions provided.");
-            if (!IsConnected()) await ConnectAsync();
-            if (!IsConnected()) throw new InvalidOperationException("Not connected to the database.");
+            if (!await TryConnectAsync()) throw new InvalidOperationException("Not connected to the database.");
 
             if (string.IsNullOrEmpty(_sheetName))
                 throw new ArgumentException($"Invalid table name: {_sheetName}");
@@ -175,12 +174,7 @@ namespace RepositoriesCore
                 throw new InvalidOperationException("SheetName is not set.");
 
             // 若尚未连接则尝试连接（避免调用方忘记先 Connect）
-            if (!IsConnected())
-            {
-                await ConnectAsync();
-            }
-            if (!IsConnected())
-                throw new InvalidOperationException("Not connected to the database.");
+            if (!await TryConnectAsync()) throw new InvalidOperationException("Not connected to the database.");
 
             // 使用 INFORMATION_SCHEMA 精确判断，避免 LIKE 误判及特殊字符问题
             const string sql = @"SELECT 1 FROM INFORMATION_SCHEMA.TABLES 

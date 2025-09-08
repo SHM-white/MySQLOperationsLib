@@ -11,14 +11,20 @@ namespace TestUtils
         {
             try 
             {                
-                var repo = await CreateRepositoryAsync();
+                var repo = CreateRepository();
                 Console.WriteLine($"Repo1 is connected: {repo.IsConnected()}");
-                Console.WriteLine($"Repo1 IsInitialized: {repo.DatabaseIsInitialized()}");
+                Console.WriteLine($"Repo1 IsInitialized: {await repo.DatabaseIsInitializedAsync()}");
                 
                 var repo2 = await CreateRepositoryAsync();
                 Console.WriteLine($"Repo2 is connected: {repo2.IsConnected()}");
-                Console.WriteLine($"Repo2 IsInitialized: {repo2.DatabaseIsInitialized()}");
+                Console.WriteLine($"Repo2 IsInitialized: {await repo2.DatabaseIsInitializedAsync()}");
                 
+                if (!await repo.DatabaseIsInitializedAsync())
+                {
+                    await repo.InitializeDatabaseAsync(repo.DatabaseDefinition);
+                    Console.WriteLine($"Repo1 initialized the database.");
+                }
+
                 Console.WriteLine($"Type 'exit' to quit.");
                 while (true)
                 {
@@ -26,7 +32,7 @@ namespace TestUtils
                     var input = Console.ReadLine();
                     if (string.IsNullOrEmpty(input)) continue;
                     if (input.Equals("exit", StringComparison.OrdinalIgnoreCase)) break;
-                    var output = repo.ExecuteCommand(input);
+                    var output = await repo.ExecuteCommandAsync(input);
                     Console.WriteLine($"{output}");
                 }
             }            

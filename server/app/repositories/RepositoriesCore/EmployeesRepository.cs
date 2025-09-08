@@ -27,7 +27,7 @@ namespace RepositoriesCore
 
         public override async Task<string[]?> ReadRecordsAsync(string[] UUIDs)
         {
-            if (!IsConnected()) await ConnectAsync();
+            if (!await TryConnectAsync()) throw new InvalidOperationException("Not connected to the database.");
             var sqlCommand = $"SELECT * FROM `{SheetName}` WHERE `UUID` IN ({string.Join(",", UUIDs.Select(id => $"'{id}'"))});";
             var cmd = new MySqlConnector.MySqlCommand(sqlCommand, _connection);
             var reader = await cmd.ExecuteReaderAsync();

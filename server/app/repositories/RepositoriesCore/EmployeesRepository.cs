@@ -25,20 +25,14 @@ namespace RepositoriesCore
         {
         }
 
-        public override bool CreateRecords(string[] records)
+        public override async Task<string[]?> ReadRecordsAsync(string[] UUIDs)
         {
-            // empty implementation
-            return false;
-        }
-
-        public override string[]? ReadRecords(string[] UUIDs)
-        {
-            if (!IsConnected()) Connect();
+            if (!IsConnected()) await ConnectAsync();
             var sqlCommand = $"SELECT * FROM `{SheetName}` WHERE `UUID` IN ({string.Join(",", UUIDs.Select(id => $"'{id}'"))});";
             var cmd = new MySqlConnector.MySqlCommand(sqlCommand, _connection);
-            var reader = cmd.ExecuteReader();
+            var reader = await cmd.ExecuteReaderAsync();
             var results = new List<string>();
-            while (reader.Read())
+            while (await reader.ReadAsync())
             {
                 var record = new Dictionary<string, object?>();
                 foreach (var col in DatabaseDefinition)
@@ -50,22 +44,24 @@ namespace RepositoriesCore
             return results?.ToArray();
         }
 
-        public override bool UpdateRecord(string UUID, string record)
+
+        public override Task<bool> AddNewRecordsAsync(string[] records)
         {
-            // empty implementation
-            return false;
+            throw new NotImplementedException();
         }
 
-        public override bool DeleteRecords(string[] UUIDs)
+        public override Task<bool> UpdateRecordAsync(string UUID, string record)
         {
-            // empty implementation
-            return false;
+            throw new NotImplementedException();
+        }
+        public override Task<bool> DeleteRecordsAsync(string[] UUIDs)
+        {
+            throw new NotImplementedException();
         }
 
-        public override string[]? SearchRecordsByUserId(string userId)
+        public override Task<string[]?> SearchRecordsAsync(string searchTarget, object content)
         {
-            // empty implementation
-            return null;
+            throw new NotImplementedException();
         }
     }
 }

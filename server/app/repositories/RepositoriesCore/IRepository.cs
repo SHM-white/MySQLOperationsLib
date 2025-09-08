@@ -7,22 +7,23 @@ namespace RepositoriesCore
     {
         string ConnectionString { get; set; }
         string SheetName { get; }
+        // Sync versions
         bool IsConnected();
-        bool Connect(string ConnectionString);
-        bool Connect();
-        Task<bool> ConnectAsync(string connectionString);
-        Task<bool> ConnectAsync();
-        Task<bool> TryConnectAsync();
         void Disconnect();
         void Dispose();
         IRepository Clone();
-        bool CreateRecords(string[] records);
-        bool UpdateRecord(string UUID, string record);
-        string[]? ReadRecords(string[] UUIDs);
-        bool DeleteRecords(string[] UUIDs);
-        string[]? SearchRecordsByUserId(string userId);
-        bool DatabaseIsInitialized();
-        bool InitializeDatabase(IEnumerable<ColumnDefinition> columns);
+        Task<bool> DatabaseIsInitializedAsync();
+        Task<bool> InitializeDatabaseAsync(IEnumerable<ColumnDefinition> columns);
+        // Async versions
+        Task<bool> ConnectAsync(string connectionString);
+        Task<bool> ConnectAsync();
+        Task<bool> TryConnectAsync();
+        Task<bool> AddNewRecordsAsync(string[] records);
+        Task<bool> UpdateRecordAsync(string UUID, string record);
+        Task<string[]?> ReadRecordsAsync(string[] UUIDs);
+        Task<bool> DeleteRecordsAsync(string[] UUIDs);
+        Task<string[]?> SearchRecordsAsync(string searchTarget, object content);
+        Task<string> ExecuteCommandAsync(string commandText);
         static bool IsValidConnectionString(string connectionString)
         {
             try

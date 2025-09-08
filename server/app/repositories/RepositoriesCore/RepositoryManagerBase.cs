@@ -11,18 +11,21 @@ namespace RepositoriesCore
 {
     public abstract class RepositoryManagerBase : IRepository, IDisposable
     {
-        public abstract List<ColumnDefinition> DatabaseDefinition { get; }
         protected RepositoryManagerBase(string? connectionString, string sheetName)
         {
             _connectionString = connectionString ?? string.Empty;
             _sheetName = sheetName;
-            Connect();
+            Task.Run(async () => await ConnectAsync()).Wait();
         }
         ~RepositoryManagerBase()
         {
             Dispose(false);
         }
+
+        // Properties and fields
         private string _connectionString;
+        protected string _sheetName;
+        protected MySqlConnection? _connection;
         public string ConnectionString {
             get => _connectionString;
             set {
@@ -33,43 +36,19 @@ namespace RepositoriesCore
                 else throw new ArgumentException($"Connection string is illegal: {value}");
             }
         }
-        protected MySqlConnection? _connection;
         protected MySqlConnection? Connection => _connection; // 连接实例不暴露给外部
-        protected string _sheetName;
         public string SheetName => _sheetName;
+
+        // Methods implementation
         public virtual IRepository Clone()
         {
             return (IRepository)MemberwiseClone();
         }
-
-        public virtual bool Connect(string ConnectionString)
-        {
-            this.ConnectionString = ConnectionString;
-            return Connect();
-        }
-        public virtual bool Connect()
-        {
-            if (string.IsNullOrEmpty(ConnectionString))
-            {
-                return false;
-            }
-            if (_connection is null)
-            {
-                _connection = new MySqlConnection(ConnectionString);
-            }
-            if (_connection is not null && _connection.State != System.Data.ConnectionState.Open)
-            {
-                _connection.Open();
-            }
-            return _connection is not null && _connection.State == System.Data.ConnectionState.Open;
-        }
-
         public virtual async Task<bool> ConnectAsync(string connectionString)
         {
             this.ConnectionString = connectionString;
             return await ConnectAsync();
         }
-
         public virtual async Task<bool> ConnectAsync()
         {
             if (string.IsNullOrEmpty(ConnectionString))
@@ -86,7 +65,6 @@ namespace RepositoriesCore
             }
             return _connection is not null && _connection.State == System.Data.ConnectionState.Open;
         }
-
         public virtual void Disconnect()
         {
             if (_connection is not null)
@@ -112,14 +90,12 @@ namespace RepositoriesCore
                 try { Disconnect(); } catch { }
             }
         }
-
-        // 新增：基于列定义动态建表
-        public virtual bool InitializeDatabase(IEnumerable<ColumnDefinition> columns)
+        public virtual async Task<bool> InitializeDatabaseAsync(IEnumerable<ColumnDefinition> columns)
         {
             if (columns is null) throw new ArgumentNullException(nameof(columns));
             var cols = columns.ToList();
             if (!cols.Any()) throw new ArgumentException("No column definitions provided.");
-            if (!IsConnected()) Connect();
+            if (!IsConnected()) await ConnectAsync();
             if (!IsConnected()) throw new InvalidOperationException("Not connected to the database.");
 
             if (string.IsNullOrEmpty(_sheetName))
@@ -184,7 +160,7 @@ namespace RepositoriesCore
 ) DEFAULT CHARSET=utf8mb4;";
 
             using var cmd = new MySqlCommand(createTableSql, _connection);
-            cmd.ExecuteNonQuery();
+            await cmd.ExecuteNonQueryAsync();
             return true;
         }
         public virtual bool IsConnected()
@@ -192,17 +168,7 @@ namespace RepositoriesCore
             return _connection is not null && _connection.State == System.Data.ConnectionState.Open;
         }
 
-        public abstract string[]? ReadRecords(string[] UUIDs);
-
-        public abstract string[]? SearchRecordsByUserId(string userId);
-
-        public abstract bool UpdateRecord(string UUID, string record);
-
-        public abstract bool CreateRecords(string[] records);
-
-        public abstract bool DeleteRecords(string[] UUIDs);
-
-        public virtual bool DatabaseIsInitialized()
+        public virtual async Task<bool> DatabaseIsInitializedAsync()
         {
             // 校验基础参数
             if (string.IsNullOrWhiteSpace(_sheetName))
@@ -211,7 +177,7 @@ namespace RepositoriesCore
             // 若尚未连接则尝试连接（避免调用方忘记先 Connect）
             if (!IsConnected())
             {
-                Connect();
+                await ConnectAsync();
             }
             if (!IsConnected())
                 throw new InvalidOperationException("Not connected to the database.");
@@ -223,7 +189,7 @@ namespace RepositoriesCore
             {
                 using var cmd = new MySqlCommand(sql, _connection);
                 cmd.Parameters.AddWithValue("@table", _sheetName);
-                var result = cmd.ExecuteScalar();
+                var result = await cmd.ExecuteScalarAsync();
                 return result is not null; // 有行即存在
             }
             catch (MySqlException ex)
@@ -232,7 +198,7 @@ namespace RepositoriesCore
             }
         }
 
-        public virtual string ExecuteCommand(string commandText)
+        public virtual async Task<string> ExecuteCommandAsync(string commandText)
         {
             if (!IsConnected())
             {
@@ -240,7 +206,7 @@ namespace RepositoriesCore
             }
             using (var command = new MySqlCommand(commandText, _connection))
             {
-                var result = command.ExecuteScalar();
+                var result = await command.ExecuteScalarAsync();
                 return result?.ToString() ?? string.Empty;
             }
         }
@@ -253,5 +219,16 @@ namespace RepositoriesCore
             }
             return IsConnected();
         }
+
+        // Abstract methods to be implemented by subclasses
+        public abstract Task<bool> AddNewRecordsAsync(string[] records);
+        public abstract Task<bool> UpdateRecordAsync(string UUID, string record);
+        public abstract Task<string[]?> ReadRecordsAsync(string[] UUIDs);
+        public abstract Task<bool> DeleteRecordsAsync(string[] UUIDs);
+        public abstract Task<string[]?> SearchRecordsAsync(string searchTarget, object content);
+
+        // Database structure definition
+        public abstract List<ColumnDefinition> DatabaseDefinition { get; }
+
     }
 }

@@ -1,10 +1,12 @@
 ﻿using MySqlConnector;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace RepositoriesCore
 {
-    public interface IRepository
+    public partial interface IRepository
     {
+        List<ColumnDefinition> DatabaseDefinition { get; }
         string ConnectionString { get; set; }
         string SheetName { get; }
         // Sync versions
@@ -20,6 +22,9 @@ namespace RepositoriesCore
         Task<bool> DeleteRecordsAsync(string[] UUIDs);
         Task<string[]?> SearchRecordsAsync(string searchTarget, object content);
         Task<string> ExecuteCommandAsync(string commandText);
+    }
+    public partial interface IRepository
+    {
         static bool IsValidConnectionString(string connectionString)
         {
             try
@@ -46,5 +51,19 @@ namespace RepositoriesCore
             };
             return builder.ConnectionString;
         }
+        protected static async Task<string> SerializeToJsonAsync(Dictionary<string, object?> record)
+        {
+            using var stream = new MemoryStream();
+            await JsonSerializer.SerializeAsync(stream, record, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                WriteIndented = false
+            });
+
+            stream.Position = 0;
+            using var reader = new StreamReader(stream);
+            return await reader.ReadToEndAsync();
+        }
+
     }
 }

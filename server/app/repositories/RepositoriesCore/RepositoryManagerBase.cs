@@ -9,7 +9,23 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 namespace RepositoriesCore
 {
-    public abstract class RepositoryManagerBase : IRepository, IDisposable
+    public abstract partial class RepositoryManagerBase : IRepository, IDisposable
+    {
+        // Abstract methods to be implemented by subclasses
+        public abstract Task<bool> AddNewRecordsAsync(string[] records);
+        public abstract Task<bool> UpdateRecordAsync(string UUID, string record);
+        public abstract Task<bool> DeleteRecordsAsync(string[] UUIDs);
+        public abstract Task<string[]?> SearchRecordsAsync(string searchTarget, object content);
+
+        // Database structure definition
+        public abstract List<ColumnDefinition> DatabaseDefinition { get; }
+
+        // Properties and fields
+        private string _connectionString;
+        protected string _sheetName;
+
+    }
+    public abstract partial class RepositoryManagerBase : IRepository, IDisposable
     {
         protected RepositoryManagerBase(string? connectionString, string sheetName)
         {
@@ -20,9 +36,6 @@ namespace RepositoriesCore
         {
         }
 
-        // Properties and fields
-        private string _connectionString;
-        protected string _sheetName;
         
         public string ConnectionString {
             get => _connectionString;
@@ -252,15 +265,42 @@ namespace RepositoriesCore
                 throw new InvalidOperationException($"Failed to execute command. MySQL error {ex.Number}: {ex.Message}", ex);
             }
         }
+        public virtual async Task<string[]?> ReadRecordsAsync(string[] UUIDs)
+        {
+            using var connection = await TryConnectAsync();
+            if (connection == null)
+                throw new InvalidOperationException("Cannot establish database connection.");
 
-        // Abstract methods to be implemented by subclasses
-        public abstract Task<bool> AddNewRecordsAsync(string[] records);
-        public abstract Task<bool> UpdateRecordAsync(string UUID, string record);
-        public abstract Task<string[]?> ReadRecordsAsync(string[] UUIDs);
-        public abstract Task<bool> DeleteRecordsAsync(string[] UUIDs);
-        public abstract Task<string[]?> SearchRecordsAsync(string searchTarget, object content);
+            var sqlCommand = $"SELECT * FROM `{SheetName}` WHERE `UUID` IN ({string.Join(",", UUIDs.Select(id => $"'{id}'"))});";
 
-        // Database structure definition
-        public abstract List<ColumnDefinition> DatabaseDefinition { get; }
+            try
+            {
+                // 使用 using 语句来管理资源
+                using var cmd = new MySqlConnector.MySqlCommand(sqlCommand, connection);
+                using var reader = await cmd.ExecuteReaderAsync();
+                var results = new List<string>();
+
+                while (await reader.ReadAsync())
+                {
+                    var record = new Dictionary<string, object?>();
+                    foreach (var col in DatabaseDefinition)
+                    {
+                        record[col.Name] = reader[col.Name] is DBNull ? null : reader[col.Name];
+                    }
+
+                    // 使用异步 JSON 序列化
+                    var jsonString = await IRepository.SerializeToJsonAsync(record);
+                    results.Add(jsonString);
+                }
+
+                return results?.ToArray();
+            }
+            catch (MySqlConnector.MySqlException ex)
+            {
+                throw new InvalidOperationException($"Failed to read records. MySQL error {ex.Number}: {ex.Message}", ex);
+            }
+        }
     }
+
+
 }

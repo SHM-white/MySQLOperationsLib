@@ -6,22 +6,20 @@ namespace RepositoriesCore
 {
     public partial interface IRepository
     {
-        IEnumerable<ColumnDefinition> DatabaseDefinition { get; }
-        string ConnectionString { get; set; }
-        string SheetName { get; }
-        // Sync versions
-        void Dispose();
-        IRepository Clone();
-        Task<bool> DatabaseIsInitializedAsync();
-        Task<bool> InitializeDatabaseAsync(IEnumerable<ColumnDefinition> columns);
-        // Async versions
-        Task<MySqlConnection?> TryConnectAsync();
-        Task<bool> AddNewRecordsAsync(Dictionary<string, object?>[] records);
-        Task<bool> UpdateRecordAsync(string UUID, Dictionary<string, object?> records);
-        Task<string[]?> ReadRecordsAsync(string[] UUIDs);
-        Task<bool> DeleteRecordsAsync(string[] UUIDs);
-        Task<string[]?> SearchRecordsAsync(string searchTarget, object content);
-        Task<string> ExecuteCommandAsync(string commandText);
+        IEnumerable<ColumnDefinition> DatabaseDefinition { get; } // 数据库表定义
+        string ConnectionString { get; set; } // 数据库连接字符串
+        string SheetName { get; } // 数据库表名称
+        void Dispose(); // 释放资源
+        IRepository Clone(); // 克隆当前实例
+        Task<bool> DatabaseIsInitializedAsync(); // 检查数据库表是否已初始化
+        Task<bool> InitializeDatabaseAsync(IEnumerable<ColumnDefinition> columns); // 初始化数据库表
+        Task<MySqlConnection?> TryConnectAsync(); // 尝试连接数据库，返回 MySqlConnection 或 null
+        Task<bool> AddNewRecordsAsync(Dictionary<string, object?>[] records); // 添加新记录
+        Task<bool> UpdateRecordAsync(string UUID, Dictionary<string, object?> records); // 更新记录
+        Task<string[]?> ReadRecordsAsync(string[] UUIDs); // 读取记录，返回 JSON 字符串数组
+        Task<bool> DeleteRecordsAsync(string[] UUIDs); // 删除记录
+        Task<string[]?> SearchRecordsAsync(string searchTarget, object content); // 搜索记录，返回 JSON 字符串数组
+        Task<string> ExecuteCommandAsync(string commandText); // 执行自定义 SQL 命令，返回结果
     }
     public partial interface IRepository
     {

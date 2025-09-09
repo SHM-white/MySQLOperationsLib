@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Text.Json;
 using System.IO;
 using ZstdSharp.Unsafe;
+using System.Reflection.Metadata.Ecma335;
 
 namespace RepositoriesCore
 {
@@ -30,43 +31,34 @@ namespace RepositoriesCore
             return employeeRecords.ToArray();
         }
         
-        public override async Task<bool> AddNewRecordsAsync(string[] records)
+        public async Task<bool> AddNewRecordsAsync(EmployeeRecord[] records)
         {
-            using var connection = await TryConnectAsync() ?? throw new InvalidOperationException("Cannot establish database connection.");
-
-            // TODO: 实现添加记录逻辑
-            await Task.CompletedTask;
-            return false;
+            var recordsDictionary = records.Select(
+                r => RecordToDict(r) ?? throw new ArgumentNullException(nameof(r), "Record cannot be null.")
+                ).ToArray() ?? Array.Empty<Dictionary<string, object?>>();
+            return await AddNewRecordsAsync(recordsDictionary);
         }
 
-        public override async Task<bool> UpdateRecordAsync(string UUID, string record)
+        public async Task<bool> UpdateRecordAsync(string UUID, EmployeeRecord record)
         {
-            using var connection = await TryConnectAsync() ?? throw new InvalidOperationException("Cannot establish database connection.");
-
-            // TODO: 实现更新记录逻辑
-            await Task.CompletedTask;
-            return false;
-        }
-        
-        public override async Task<bool> DeleteRecordsAsync(string[] UUIDs)
-        {
-            using var connection = await TryConnectAsync();
-            if (connection == null) 
-                throw new InvalidOperationException("Cannot establish database connection.");
-            
-            // TODO: 实现删除记录逻辑
-            await Task.CompletedTask;
-            return false;
+            var recordDictionary = RecordToDict(record);
+            if (recordDictionary == null)
+                return false;
+            return await UpdateRecordAsync(UUID, recordDictionary);
         }
 
-        public override async Task<string[]?> SearchRecordsAsync(string searchTarget, object content)
+        public new async Task<EmployeeRecord[]?> SearchRecordsAsync(string searchTarget, object content)
         {
-            using var connection = await TryConnectAsync();
-            if (connection == null) 
-                throw new InvalidOperationException("Cannot establish database connection.");
-            
-            // TODO: 实现搜索记录逻辑
-            await Task.CompletedTask;
+            var result = await base.SearchRecordsAsync(searchTarget, content);
+            if (result != null && result.Length > 0)
+            {
+                var employeeRecords = new List<EmployeeRecord>();
+                foreach (var item in result)
+                {
+                    employeeRecords.Add(JsonSerializer.Deserialize<EmployeeRecord>(item) ?? throw new JsonException("Failed to deserialize record."));
+                }
+                return employeeRecords.ToArray();
+            }
             return null;
         }
     }
@@ -94,5 +86,20 @@ namespace RepositoriesCore
             new (Name:"created_at", Type:DbColumnType.DateTime, IsNullable:false, DefaultValue:"CURRENT_TIMESTAMP", Comment:"创建时间"),
             new (Name:"updated_at", Type:DbColumnType.DateTime, IsNullable:false, DefaultValue:"CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP", Comment:"更新时间")
         };
+        public static Dictionary<string, object?>? RecordToDict(EmployeeRecord? record)
+        {
+            if (record == null) return null;
+            return new Dictionary<string, object?>
+            {
+                { "UUID", record.UUID },
+                { "user_id", record.UserId },
+                { "name", record.Name },
+                { "department", record.Department },
+                { "workstation_id", record.WorkstationId },
+                { "preference", record.Preference },
+                { "created_at", record.CreatedAt },
+                { "updated_at", record.UpdatedAt }
+            };
+        }
     }
 }

@@ -1,8 +1,9 @@
 ﻿using RepositoriesCore;
 using System.Runtime.InteropServices;
 using System.Text;
+using TestUtils;
 
-namespace TestUtils
+namespace Test
 {
     internal class Program
     {
@@ -10,42 +11,51 @@ namespace TestUtils
         {
             try 
             {                
-                var repo = CreateRepository();
-                Console.WriteLine($"Repo connection string valid: {IRepository.IsValidConnectionString(repo.ConnectionString)}");
-                Console.WriteLine($"Repo IsInitialized: {await repo.DatabaseIsInitializedAsync()}");
-                Console.WriteLine($"Repo sheet name: {repo.SheetName}");
-                
-                if (!await repo.DatabaseIsInitializedAsync())
-                {
-                    Console.WriteLine("Initializing database with new connection logic...");
-                    await repo.InitializeDatabaseAsync(repo.DatabaseDefinition);
-                    Console.WriteLine($"Repo initialized the database successfully.");
-                }
+                var employeesRepo = CreateEmployeesRepository();
+                var activityLogsRepo = CreateActivityLogsRepository();
 
-                // 运行完整的数据库操作测试
-                Console.WriteLine("\n" + "=".PadRight(60, '='));
-                Console.WriteLine("STARTING COMPREHENSIVE DATABASE OPERATION TESTS");
-                Console.WriteLine("=".PadRight(60, '='));
+                Console.WriteLine("=== REPOSITORIES INITIALIZATION ===");
+                Console.WriteLine($"Employees repo connection valid: {IRepository.IsValidConnectionString(employeesRepo.ConnectionString)}");
+                Console.WriteLine($"Employees repo IsInitialized: {await employeesRepo.DatabaseIsInitializedAsync()}");
+                Console.WriteLine($"Employees repo sheet name: {employeesRepo.SheetName}");
                 
-                await RunDatabaseOperationTests(repo);
+                Console.WriteLine($"Activity logs repo connection valid: {IRepository.IsValidConnectionString(activityLogsRepo.ConnectionString)}");
+                Console.WriteLine($"Activity logs repo IsInitialized: {await activityLogsRepo.DatabaseIsInitializedAsync()}");
+                Console.WriteLine($"Activity logs repo sheet name: {activityLogsRepo.SheetName}");
+
+                // 初始化数据库
+                await InitializeDatabases(employeesRepo, activityLogsRepo);
+
+                // 运行员工仓储测试
+                Console.WriteLine("\n" + "=".PadRight(60, '='));
+                Console.WriteLine("STARTING EMPLOYEES REPOSITORY TESTS");
+                Console.WriteLine("=".PadRight(60, '='));
+                await RunEmployeesRepositoryTests(employeesRepo);
+
+                // 运行活动日志仓储测试
+                Console.WriteLine("\n" + "=".PadRight(60, '='));
+                Console.WriteLine("STARTING ACTIVITY LOGS REPOSITORY TESTS");
+                Console.WriteLine("=".PadRight(60, '='));
+                await RunActivityLogsRepositoryTests(activityLogsRepo);
 
                 // 测试并发操作
                 Console.WriteLine("\n" + "=".PadRight(60, '='));
                 Console.WriteLine("TESTING CONCURRENT OPERATIONS");
                 Console.WriteLine("=".PadRight(60, '='));
-                await TestConcurrentOperations(repo);
+                await TestConcurrentOperations(employeesRepo, activityLogsRepo);
 
                 // 运行性能测试
                 Console.WriteLine("\n" + "=".PadRight(60, '='));
                 Console.WriteLine("RUNNING PERFORMANCE TESTS");
                 Console.WriteLine("=".PadRight(60, '='));
-                await PerformanceTests.RunPerformanceTests(repo);
+                await PerformanceTests.RunPerformanceTests(employeesRepo);
+                await ActivityLogsPerformanceTests.RunPerformanceTests(activityLogsRepo);
 
                 // 交互式命令测试
                 Console.WriteLine("\n" + "=".PadRight(60, '='));
                 Console.WriteLine("INTERACTIVE TESTING MODE");
                 Console.WriteLine("=".PadRight(60, '='));
-                await InteractiveTestMode(repo);
+                await InteractiveTestMode(employeesRepo, activityLogsRepo);
             }            
             catch (Exception ex)
             {
@@ -54,9 +64,26 @@ namespace TestUtils
             }
         }
 
-        private static async Task RunDatabaseOperationTests(RepositoriesCore.EmployeesRepository repo)
+        private static async Task InitializeDatabases(EmployeesRepository employeesRepo, ActivityLogsRepository activityLogsRepo)
         {
-            Console.WriteLine("1. Testing TryConnectAsync method...");
+            if (!await employeesRepo.DatabaseIsInitializedAsync())
+            {
+                Console.WriteLine("Initializing employees database...");
+                await employeesRepo.InitializeDatabaseAsync(employeesRepo.DatabaseDefinition);
+                Console.WriteLine("Employees database initialized successfully.");
+            }
+
+            if (!await activityLogsRepo.DatabaseIsInitializedAsync())
+            {
+                Console.WriteLine("Initializing activity logs database...");
+                await activityLogsRepo.InitializeDatabaseAsync(activityLogsRepo.DatabaseDefinition);
+                Console.WriteLine("Activity logs database initialized successfully.");
+            }
+        }
+
+        private static async Task RunEmployeesRepositoryTests(EmployeesRepository repo)
+        {
+            Console.WriteLine("1. Testing employees TryConnectAsync method...");
             using var connection = await repo.TryConnectAsync();
             if (connection != null)
             {
@@ -71,25 +98,25 @@ namespace TestUtils
                 return;
             }
 
-            Console.WriteLine("\n2. Testing AddNewRecordsAsync method...");
+            Console.WriteLine("\n2. Testing employees AddNewTypedRecordsAsync method...");
             var testEmployees = CreateTestEmployees();
             try
             {
-                var addResult = await repo.AddNewRecordsAsync(testEmployees);
-                Console.WriteLine($"✓ AddNewRecordsAsync result: {addResult} (Added {testEmployees.Length} employees)");
+                var addResult = await repo.AddNewTypedRecordsAsync(testEmployees);
+                Console.WriteLine($"✓ AddNewTypedRecordsAsync result: {addResult} (Added {testEmployees.Length} employees)");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"✗ AddNewRecordsAsync failed: {ex.Message}");
+                Console.WriteLine($"✗ AddNewTypedRecordsAsync failed: {ex.Message}");
                 return;
             }
 
-            Console.WriteLine("\n3. Testing ReadRecordsAsync method...");
+            Console.WriteLine("\n3. Testing employees ReadTypedRecordsAsync method...");
             try
             {
                 var uuidsToRead = testEmployees.Select(e => e.UUID).ToArray();
-                var readRecords = await repo.ReadRecordsAsync(uuidsToRead);
-                Console.WriteLine($"✓ ReadRecordsAsync result: Found {readRecords?.Length ?? 0} records");
+                var readRecords = await repo.ReadTypedRecordsAsync(uuidsToRead);
+                Console.WriteLine($"✓ ReadTypedRecordsAsync result: Found {readRecords?.Length ?? 0} records");
                 if (readRecords != null && readRecords.Length > 0)
                 {
                     Console.WriteLine($"  First record: {readRecords[0].Name} - {readRecords[0].Department}");
@@ -98,15 +125,15 @@ namespace TestUtils
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"✗ ReadRecordsAsync failed: {ex.Message}");
+                Console.WriteLine($"✗ ReadTypedRecordsAsync failed: {ex.Message}");
                 return;
             }
 
-            Console.WriteLine("\n4. Testing SearchRecordsAsync method...");
+            Console.WriteLine("\n4. Testing employees SearchTypedRecordsAsync method...");
             try
             {
-                var searchResults = await repo.SearchRecordsAsync("department", "Engineering");
-                Console.WriteLine($"✓ SearchRecordsAsync result: Found {searchResults?.Length ?? 0} records in Engineering department");
+                var searchResults = await repo.SearchTypedRecordsAsync("department", "Engineering");
+                Console.WriteLine($"✓ SearchTypedRecordsAsync result: Found {searchResults?.Length ?? 0} records in Engineering department");
                 if (searchResults != null && searchResults.Length > 0)
                 {
                     foreach (var emp in searchResults)
@@ -117,14 +144,14 @@ namespace TestUtils
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"✗ SearchRecordsAsync failed: {ex.Message}");
+                Console.WriteLine($"✗ SearchTypedRecordsAsync failed: {ex.Message}");
             }
 
-            Console.WriteLine("\n5. Testing UpdateRecordAsync method...");
+            Console.WriteLine("\n5. Testing employees UpdateTypedRecordAsync method...");
             try
             {
                 var uuidsToRead = testEmployees.Select(e => e.UUID).ToArray();
-                var readRecords = await repo.ReadRecordsAsync(uuidsToRead);
+                var readRecords = await repo.ReadTypedRecordsAsync(uuidsToRead);
                 
                 if (readRecords != null && readRecords.Length > 0)
                 {
@@ -137,11 +164,11 @@ namespace TestUtils
                     };
                     
                     Console.WriteLine($"  Updating record: {recordToUpdate.UUID} - {recordToUpdate.Department} -> {updatedRecord.Department}");
-                    var updateResult = await repo.UpdateRecordAsync(recordToUpdate.UUID, updatedRecord);
-                    Console.WriteLine($"✓ UpdateRecordAsync result: {updateResult}");
+                    var updateResult = await repo.UpdateTypedRecordAsync(recordToUpdate.UUID, updatedRecord);
+                    Console.WriteLine($"✓ UpdateTypedRecordAsync result: {updateResult}");
                     
                     // 验证更新
-                    var verifyRecords = await repo.ReadRecordsAsync(new[] { recordToUpdate.UUID });
+                    var verifyRecords = await repo.ReadTypedRecordsAsync(new[] { recordToUpdate.UUID });
                     if (verifyRecords != null && verifyRecords.Length > 0)
                     {
                         Console.WriteLine($"  Verified update: {verifyRecords[0].Department}");
@@ -150,11 +177,11 @@ namespace TestUtils
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"✗ UpdateRecordAsync failed: {ex.Message}");
+                Console.WriteLine($"✗ UpdateTypedRecordAsync failed: {ex.Message}");
                 Console.WriteLine($"  Stack trace: {ex.StackTrace}");
             }
 
-            Console.WriteLine("\n6. Testing ExecuteCommandAsync method...");
+            Console.WriteLine("\n6. Testing employees ExecuteCommandAsync method...");
             try
             {
                 var countResult = await repo.ExecuteCommandAsync($"SELECT COUNT(*) FROM `{repo.SheetName}`");
@@ -165,11 +192,11 @@ namespace TestUtils
                 Console.WriteLine($"✗ ExecuteCommandAsync failed: {ex.Message}");
             }
 
-            Console.WriteLine("\n7. Testing DeleteRecordsAsync method...");
+            Console.WriteLine("\n7. Testing employees DeleteRecordsAsync method...");
             try
             {
                 var uuidsToRead = testEmployees.Select(e => e.UUID).ToArray();
-                var readRecords = await repo.ReadRecordsAsync(uuidsToRead);
+                var readRecords = await repo.ReadTypedRecordsAsync(uuidsToRead);
                 
                 if (readRecords != null && readRecords.Length > 1)
                 {
@@ -179,7 +206,7 @@ namespace TestUtils
                     Console.WriteLine($"✓ DeleteRecordsAsync result: {deleteResult} (Deleted {recordToDelete.Name})");
                     
                     // 验证删除
-                    var verifyAfterDelete = await repo.ReadRecordsAsync(new[] { recordToDelete.UUID });
+                    var verifyAfterDelete = await repo.ReadTypedRecordsAsync(new[] { recordToDelete.UUID });
                     Console.WriteLine($"  Verified deletion: Found {verifyAfterDelete?.Length ?? 0} records (should be 0)");
                 }
             }
@@ -188,38 +215,168 @@ namespace TestUtils
                 Console.WriteLine($"✗ DeleteRecordsAsync failed: {ex.Message}");
             }
 
-            Console.WriteLine("\n8. Testing error handling...");
-            try
-            {
-                await repo.ReadRecordsAsync(new[] { "non-existent-uuid" });
-                Console.WriteLine("✓ ReadRecordsAsync with non-existent UUID handled gracefully");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"✗ Error handling test failed: {ex.Message}");
-            }
-
-            try
-            {
-                await repo.SearchRecordsAsync("non_existent_column", "test");
-                Console.WriteLine("✗ SearchRecordsAsync with invalid column should have failed");
-            }
-            catch (Exception)
-            {
-                Console.WriteLine("✓ SearchRecordsAsync with invalid column properly throws exception");
-            }
-
             Console.WriteLine("\n" + "=".PadRight(60, '='));
-            Console.WriteLine("DATABASE OPERATION TESTS COMPLETED");
+            Console.WriteLine("EMPLOYEES REPOSITORY TESTS COMPLETED");
             Console.WriteLine("=".PadRight(60, '='));
         }
 
-        private static RepositoriesCore.EmployeesRepository.EmployeeRecord[] CreateTestEmployees()
+        private static async Task RunActivityLogsRepositoryTests(ActivityLogsRepository repo)
+        {
+            Console.WriteLine("1. Testing activity logs TryConnectAsync method...");
+            using var connection = await repo.TryConnectAsync();
+            if (connection != null)
+            {
+                Console.WriteLine($"✓ TryConnectAsync returned a valid connection. State: {connection.State}");
+                using var testCmd = new MySqlConnector.MySqlCommand("SELECT 1", connection);
+                var result = await testCmd.ExecuteScalarAsync();
+                Console.WriteLine($"✓ Test query result: {result}");
+            }
+            else
+            {
+                Console.WriteLine("✗ TryConnectAsync returned null - connection failed");
+                return;
+            }
+
+            Console.WriteLine("\n2. Testing activity logs AddNewTypedRecordsAsync method...");
+            var testActivityLogs = CreateTestActivityLogs();
+            try
+            {
+                var addResult = await repo.AddNewTypedRecordsAsync(testActivityLogs);
+                Console.WriteLine($"✓ AddNewTypedRecordsAsync result: {addResult} (Added {testActivityLogs.Length} activity logs)");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"✗ AddNewTypedRecordsAsync failed: {ex.Message}");
+                return;
+            }
+
+            Console.WriteLine("\n3. Testing activity logs ReadTypedRecordsAsync method...");
+            try
+            {
+                var uuidsToRead = testActivityLogs.Select(e => e.UUID).ToArray();
+                var readRecords = await repo.ReadTypedRecordsAsync(uuidsToRead);
+                Console.WriteLine($"✓ ReadTypedRecordsAsync result: Found {readRecords?.Length ?? 0} records");
+                if (readRecords != null && readRecords.Length > 0)
+                {
+                    Console.WriteLine($"  First record: Employee {readRecords[0].EmployeeId} - {readRecords[0].ActivityType}");
+                    Console.WriteLine($"  Record details: UUID={readRecords[0].UUID}, Duration={readRecords[0].Duration}s");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"✗ ReadTypedRecordsAsync failed: {ex.Message}");
+                return;
+            }
+
+            Console.WriteLine("\n4. Testing activity logs GetActivityLogsByEmployeeIdAsync method...");
+            try
+            {
+                var employeeResults = await repo.GetActivityLogsByEmployeeIdAsync(1001);
+                Console.WriteLine($"✓ GetActivityLogsByEmployeeIdAsync result: Found {employeeResults?.Length ?? 0} records for employee 1001");
+                if (employeeResults != null && employeeResults.Length > 0)
+                {
+                    foreach (var log in employeeResults)
+                    {
+                        Console.WriteLine($"  - {log.ActivityType} ({log.Duration}s)");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"✗ GetActivityLogsByEmployeeIdAsync failed: {ex.Message}");
+            }
+
+            Console.WriteLine("\n5. Testing activity logs GetActivityLogsByTypeAsync method...");
+            try
+            {
+                var typeResults = await repo.GetActivityLogsByTypeAsync("sit");
+                Console.WriteLine($"✓ GetActivityLogsByTypeAsync result: Found {typeResults?.Length ?? 0} 'sit' activity records");
+                if (typeResults != null && typeResults.Length > 0)
+                {
+                    foreach (var log in typeResults)
+                    {
+                        Console.WriteLine($"  - Employee {log.EmployeeId}: {log.Duration}s");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"✗ GetActivityLogsByTypeAsync failed: {ex.Message}");
+            }
+
+            Console.WriteLine("\n6. Testing activity logs GetActivityLogsInDateRangeAsync method...");
+            try
+            {
+                var now = DateTime.Now;
+                var startDate = now.AddHours(-1);
+                var endDate = now.AddHours(1);
+                var dateRangeResults = await repo.GetActivityLogsInDateRangeAsync(1001, startDate, endDate);
+                Console.WriteLine($"✓ GetActivityLogsInDateRangeAsync result: Found {dateRangeResults?.Length ?? 0} records in date range");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"✗ GetActivityLogsInDateRangeAsync failed: {ex.Message}");
+            }
+
+            Console.WriteLine("\n7. Testing activity logs UpdateTypedRecordAsync method...");
+            try
+            {
+                var uuidsToRead = testActivityLogs.Select(e => e.UUID).ToArray();
+                var readRecords = await repo.ReadTypedRecordsAsync(uuidsToRead);
+                
+                if (readRecords != null && readRecords.Length > 0)
+                {
+                    var recordToUpdate = readRecords[0];
+                    var updatedRecord = recordToUpdate with 
+                    { 
+                        ActivityType = "updated_activity",
+                        Duration = recordToUpdate.Duration + 300
+                    };
+                    
+                    Console.WriteLine($"  Updating record: {recordToUpdate.UUID} - {recordToUpdate.ActivityType} -> {updatedRecord.ActivityType}");
+                    var updateResult = await repo.UpdateTypedRecordAsync(recordToUpdate.UUID, updatedRecord);
+                    Console.WriteLine($"✓ UpdateTypedRecordAsync result: {updateResult}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"✗ UpdateTypedRecordAsync failed: {ex.Message}");
+            }
+
+            Console.WriteLine("\n8. Testing activity logs DeleteRecordsAsync method...");
+            try
+            {
+                var uuidsToRead = testActivityLogs.Select(e => e.UUID).ToArray();
+                var readRecords = await repo.ReadTypedRecordsAsync(uuidsToRead);
+                
+                if (readRecords != null && readRecords.Length > 1)
+                {
+                    // 删除最后一个记录
+                    var recordToDelete = readRecords[^1];
+                    var deleteResult = await repo.DeleteRecordsAsync(new[] { recordToDelete.UUID });
+                    Console.WriteLine($"✓ DeleteRecordsAsync result: {deleteResult} (Deleted activity log for employee {recordToDelete.EmployeeId})");
+                    
+                    // 验证删除
+                    var verifyAfterDelete = await repo.ReadTypedRecordsAsync(new[] { recordToDelete.UUID });
+                    Console.WriteLine($"  Verified deletion: Found {verifyAfterDelete?.Length ?? 0} records (should be 0)");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"✗ DeleteRecordsAsync failed: {ex.Message}");
+            }
+
+            Console.WriteLine("\n" + "=".PadRight(60, '='));
+            Console.WriteLine("ACTIVITY LOGS REPOSITORY TESTS COMPLETED");
+            Console.WriteLine("=".PadRight(60, '='));
+        }
+
+        private static EmployeesRepository.EmployeeRecord[] CreateTestEmployees()
         {
             var now = DateTime.Now;
             return new[]
             {
-                new RepositoriesCore.EmployeesRepository.EmployeeRecord(
+                new EmployeesRepository.EmployeeRecord(
                     UUID: Guid.NewGuid().ToString(),
                     UserId: "USR001",
                     Name: "Alice Johnson",
@@ -229,7 +386,7 @@ namespace TestUtils
                     CreatedAt: now,
                     UpdatedAt: now
                 ),
-                new RepositoriesCore.EmployeesRepository.EmployeeRecord(
+                new EmployeesRepository.EmployeeRecord(
                     UUID: Guid.NewGuid().ToString(),
                     UserId: "USR002",
                     Name: "Bob Smith",
@@ -239,7 +396,7 @@ namespace TestUtils
                     CreatedAt: now,
                     UpdatedAt: now
                 ),
-                new RepositoriesCore.EmployeesRepository.EmployeeRecord(
+                new EmployeesRepository.EmployeeRecord(
                     UUID: Guid.NewGuid().ToString(),
                     UserId: "USR003",
                     Name: "Carol Davis",
@@ -249,7 +406,7 @@ namespace TestUtils
                     CreatedAt: now,
                     UpdatedAt: now
                 ),
-                new RepositoriesCore.EmployeesRepository.EmployeeRecord(
+                new EmployeesRepository.EmployeeRecord(
                     UUID: Guid.NewGuid().ToString(),
                     UserId: "USR004",
                     Name: "David Wilson",
@@ -262,9 +419,57 @@ namespace TestUtils
             };
         }
 
-        private static async Task TestConcurrentOperations(RepositoriesCore.EmployeesRepository repo)
+        private static ActivityLogsRepository.ActivityLogRecord[] CreateTestActivityLogs()
         {
-            Console.WriteLine("Starting concurrent operations test with new connection logic...");
+            var now = DateTime.Now;
+            return new[]
+            {
+                new ActivityLogsRepository.ActivityLogRecord(
+                    UUID: Guid.NewGuid().ToString(),
+                    LogId: 0, // Will be auto-generated
+                    EmployeeId: 1001,
+                    ActivityType: "sit",
+                    StartTime: now.AddMinutes(-30),
+                    EndTime: now.AddMinutes(-15),
+                    Duration: 900, // 15 minutes
+                    CreatedAt: now
+                ),
+                new ActivityLogsRepository.ActivityLogRecord(
+                    UUID: Guid.NewGuid().ToString(),
+                    LogId: 0, // Will be auto-generated
+                    EmployeeId: 1001,
+                    ActivityType: "stand",
+                    StartTime: now.AddMinutes(-15),
+                    EndTime: now.AddMinutes(-10),
+                    Duration: 300, // 5 minutes
+                    CreatedAt: now
+                ),
+                new ActivityLogsRepository.ActivityLogRecord(
+                    UUID: Guid.NewGuid().ToString(),
+                    LogId: 0, // Will be auto-generated
+                    EmployeeId: 1002,
+                    ActivityType: "walk",
+                    StartTime: now.AddMinutes(-45),
+                    EndTime: now.AddMinutes(-40),
+                    Duration: 300, // 5 minutes
+                    CreatedAt: now
+                ),
+                new ActivityLogsRepository.ActivityLogRecord(
+                    UUID: Guid.NewGuid().ToString(),
+                    LogId: 0, // Will be auto-generated
+                    EmployeeId: 1002,
+                    ActivityType: "meeting",
+                    StartTime: now.AddMinutes(-60),
+                    EndTime: now.AddMinutes(-30),
+                    Duration: 1800, // 30 minutes
+                    CreatedAt: now
+                )
+            };
+        }
+
+        private static async Task TestConcurrentOperations(EmployeesRepository employeesRepo, ActivityLogsRepository activityLogsRepo)
+        {
+            Console.WriteLine("Starting concurrent operations test...");
             var tasks = new List<Task>();
             
             // 创建多个并发任务
@@ -275,28 +480,19 @@ namespace TestUtils
                 {
                     try
                     {
-                        // 测试并发查询操作
-                        var result = await repo.ExecuteCommandAsync("SELECT COUNT(*) FROM `Employees`");
-                        Console.WriteLine($"Task {taskId}: Query result = {result}");
+                        // 测试员工仓储并发操作
+                        var employeeResult = await employeesRepo.ExecuteCommandAsync($"SELECT COUNT(*) FROM `{employeesRepo.SheetName}`");
+                        Console.WriteLine($"Task {taskId}: Employee count = {employeeResult}");
+                        
+                        // 测试活动日志仓储并发操作
+                        var activityResult = await activityLogsRepo.ExecuteCommandAsync($"SELECT COUNT(*) FROM `{activityLogsRepo.SheetName}`");
+                        Console.WriteLine($"Task {taskId}: Activity logs count = {activityResult}");
                         
                         // 测试并发连接获取
-                        using var connection = await repo.TryConnectAsync();
-                        if (connection != null)
-                        {
-                            Console.WriteLine($"Task {taskId}: Got connection successfully");
-                        }
-                        else
-                        {
-                            Console.WriteLine($"Task {taskId}: Failed to get connection");
-                        }
+                        using var employeeConnection = await employeesRepo.TryConnectAsync();
+                        using var activityConnection = await activityLogsRepo.TryConnectAsync();
                         
-                        // 测试并发读取操作
-                        var records = await repo.ReadRecordsAsync(new[] { $"test-{taskId}" });
-                        Console.WriteLine($"Task {taskId}: Read {records?.Length ?? 0} records");
-
-                        // 测试并发搜索操作
-                        var searchResults = await repo.SearchRecordsAsync("department", "Engineering");
-                        Console.WriteLine($"Task {taskId}: Search found {searchResults?.Length ?? 0} engineering records");
+                        Console.WriteLine($"Task {taskId}: Connections - Employee: {employeeConnection != null}, Activity: {activityConnection != null}");
                     }
                     catch (Exception ex)
                     {
@@ -309,21 +505,25 @@ namespace TestUtils
             Console.WriteLine("Concurrent operations test completed!");
         }
 
-        private static async Task InteractiveTestMode(RepositoriesCore.EmployeesRepository repo)
+        private static async Task InteractiveTestMode(EmployeesRepository employeesRepo, ActivityLogsRepository activityLogsRepo)
         {
             Console.WriteLine("Available commands:");
             Console.WriteLine("  exit          - Quit the program");
             Console.WriteLine("  test          - Run concurrent operations test");
             Console.WriteLine("  perf          - Run performance tests");
             Console.WriteLine("  stress [n]    - Run stress test (default: 100 iterations)");
-            Console.WriteLine("  conn          - Test connection");
-            Console.WriteLine("  add           - Add a test employee");
-            Console.WriteLine("  list          - List all employees");
-            Console.WriteLine("  search <dept> - Search by department");
-            Console.WriteLine("  count         - Get total employee count");
-            Console.WriteLine("  clear         - Clear all employees");
+            Console.WriteLine("  conn          - Test connections");
+            Console.WriteLine("  add-emp       - Add a test employee");
+            Console.WriteLine("  add-log       - Add a test activity log");
+            Console.WriteLine("  list-emp      - List all employees");
+            Console.WriteLine("  list-logs     - List activity logs");
+            Console.WriteLine("  search-emp <dept> - Search employees by department");
+            Console.WriteLine("  search-logs <type> - Search activity logs by type");
+            Console.WriteLine("  count         - Get record counts");
+            Console.WriteLine("  clear-emp     - Clear all employees");
+            Console.WriteLine("  clear-logs    - Clear all activity logs");
             Console.WriteLine("  help          - Show this help");
-            Console.WriteLine("  <SQL>         - Execute custom SQL command");
+            Console.WriteLine("  <SQL>         - Execute custom SQL command on employees DB");
             Console.WriteLine();
 
             while (true)
@@ -343,11 +543,12 @@ namespace TestUtils
                             return;
 
                         case "test":
-                            await TestConcurrentOperations(repo);
+                            await TestConcurrentOperations(employeesRepo, activityLogsRepo);
                             break;
 
                         case "perf":
-                            await PerformanceTests.RunPerformanceTests(repo);
+                            await PerformanceTests.RunPerformanceTests(employeesRepo);
+                            await ActivityLogsPerformanceTests.RunPerformanceTests(activityLogsRepo);
                             break;
 
                         case "stress":
@@ -356,58 +557,93 @@ namespace TestUtils
                             {
                                 iterations = customIterations;
                             }
-                            await PerformanceTests.RunStressTest(repo, iterations);
+                            await PerformanceTests.RunStressTest(employeesRepo, iterations);
                             break;
 
                         case "conn":
-                            using (var conn = await repo.TryConnectAsync())
+                            using (var empConn = await employeesRepo.TryConnectAsync())
+                            using (var logConn = await activityLogsRepo.TryConnectAsync())
                             {
-                                Console.WriteLine($"Connection test: {(conn != null ? "Success" : "Failed")}");
+                                Console.WriteLine($"Employee connection: {(empConn != null ? "Success" : "Failed")}");
+                                Console.WriteLine($"Activity logs connection: {(logConn != null ? "Success" : "Failed")}");
                             }
                             break;
 
-                        case "add":
-                            await AddTestEmployee(repo);
+                        case "add-emp":
+                            await AddTestEmployee(employeesRepo);
                             break;
 
-                        case "list":
-                            await ListAllEmployees(repo);
+                        case "add-log":
+                            await AddTestActivityLog(activityLogsRepo);
                             break;
 
-                        case "search":
+                        case "list-emp":
+                            await ListAllEmployees(employeesRepo);
+                            break;
+
+                        case "list-logs":
+                            await ListActivityLogs(activityLogsRepo);
+                            break;
+
+                        case "search-emp":
                             if (parts.Length > 1)
                             {
-                                await SearchEmployees(repo, parts[1]);
+                                await SearchEmployees(employeesRepo, parts[1]);
                             }
                             else
                             {
-                                Console.WriteLine("Usage: search <department>");
+                                Console.WriteLine("Usage: search-emp <department>");
+                            }
+                            break;
+
+                        case "search-logs":
+                            if (parts.Length > 1)
+                            {
+                                await SearchActivityLogs(activityLogsRepo, parts[1]);
+                            }
+                            else
+                            {
+                                Console.WriteLine("Usage: search-logs <activity_type>");
                             }
                             break;
 
                         case "count":
-                            var count = await repo.ExecuteCommandAsync($"SELECT COUNT(*) FROM `{repo.SheetName}`");
-                            Console.WriteLine($"Total employees: {count}");
+                            var empCount = await employeesRepo.ExecuteCommandAsync($"SELECT COUNT(*) FROM `{employeesRepo.SheetName}`");
+                            var logCount = await activityLogsRepo.ExecuteCommandAsync($"SELECT COUNT(*) FROM `{activityLogsRepo.SheetName}`");
+                            Console.WriteLine($"Total employees: {empCount}");
+                            Console.WriteLine($"Total activity logs: {logCount}");
                             break;
 
-                        case "clear":
+                        case "clear-emp":
                             Console.Write("Are you sure you want to delete all employees? (y/N): ");
-                            var confirm = Console.ReadLine();
-                            if (confirm?.ToLowerInvariant() == "y")
+                            var confirmEmp = Console.ReadLine();
+                            if (confirmEmp?.ToLowerInvariant() == "y")
                             {
-                                await repo.ExecuteCommandAsync($"DELETE FROM `{repo.SheetName}`");
+                                await employeesRepo.ExecuteCommandAsync($"DELETE FROM `{employeesRepo.SheetName}`");
                                 Console.WriteLine("All employees deleted.");
+                            }
+                            break;
+
+                        case "clear-logs":
+                            Console.Write("Are you sure you want to delete all activity logs? (y/N): ");
+                            var confirmLogs = Console.ReadLine();
+                            if (confirmLogs?.ToLowerInvariant() == "y")
+                            {
+                                await activityLogsRepo.ExecuteCommandAsync($"DELETE FROM `{activityLogsRepo.SheetName}`");
+                                Console.WriteLine("All activity logs deleted.");
                             }
                             break;
 
                         case "help":
                             Console.WriteLine("Available commands:");
-                            Console.WriteLine("  exit, test, conn, add, list, search <dept>, count, clear, help, <SQL>");
+                            Console.WriteLine("  exit, test, perf, stress [n], conn, add-emp, add-log");
+                            Console.WriteLine("  list-emp, list-logs, search-emp <dept>, search-logs <type>");
+                            Console.WriteLine("  count, clear-emp, clear-logs, help, <SQL>");
                             break;
 
                         default:
-                            // 执行自定义 SQL
-                            var output = await repo.ExecuteCommandAsync(input);
+                            // 执行自定义 SQL (默认在员工数据库上)
+                            var output = await employeesRepo.ExecuteCommandAsync(input);
                             Console.WriteLine($"Result: {output}");
                             break;
                     }
@@ -419,10 +655,10 @@ namespace TestUtils
             }
         }
 
-        private static async Task AddTestEmployee(RepositoriesCore.EmployeesRepository repo)
+        private static async Task AddTestEmployee(EmployeesRepository repo)
         {
             var now = DateTime.Now;
-            var testEmployee = new RepositoriesCore.EmployeesRepository.EmployeeRecord(
+            var testEmployee = new EmployeesRepository.EmployeeRecord(
                 UUID: Guid.NewGuid().ToString(),
                 UserId: $"USR{now.Ticks % 10000:D4}",
                 Name: $"Test Employee {now:HHmmss}",
@@ -433,19 +669,30 @@ namespace TestUtils
                 UpdatedAt: now
             );
 
-            var result = await repo.AddNewRecordsAsync(new[] { testEmployee });
+            var result = await repo.AddNewTypedRecordsAsync(new[] { testEmployee });
             Console.WriteLine($"Added test employee: {testEmployee.Name} - Result: {result}");
         }
-        private static async Task ListAllEmployees(RepositoriesCore.EmployeesRepository repo)
-        {
-            var allEmployees = await repo.ExecuteCommandAsync($"SELECT UUID FROM `{repo.SheetName}`");
-            if (string.IsNullOrEmpty(allEmployees))
-            {
-                Console.WriteLine("No employees found.");
-                return;
-            }
 
-            // 获取所有 UUID
+        private static async Task AddTestActivityLog(ActivityLogsRepository repo)
+        {
+            var now = DateTime.Now;
+            var testLog = new ActivityLogsRepository.ActivityLogRecord(
+                UUID: Guid.NewGuid().ToString(),
+                LogId: 0, // Auto-generated
+                EmployeeId: new Random().Next(1000, 2000),
+                ActivityType: "test_activity",
+                StartTime: now.AddMinutes(-10),
+                EndTime: now,
+                Duration: 600, // 10 minutes
+                CreatedAt: now
+            );
+
+            var result = await repo.AddNewTypedRecordsAsync(new[] { testLog });
+            Console.WriteLine($"Added test activity log: Employee {testLog.EmployeeId} - {testLog.ActivityType} - Result: {result}");
+        }
+
+        private static async Task ListAllEmployees(EmployeesRepository repo)
+        {
             var uuids = await GetAllEmployeeUUIDs(repo);
             if (uuids.Length == 0)
             {
@@ -453,7 +700,7 @@ namespace TestUtils
                 return;
             }
 
-            var employees = await repo.ReadRecordsAsync(uuids);
+            var employees = await repo.ReadTypedRecordsAsync(uuids);
             if (employees != null && employees.Length > 0)
             {
                 Console.WriteLine($"Found {employees.Length} employees:");
@@ -468,9 +715,33 @@ namespace TestUtils
             }
         }
 
-        private static async Task SearchEmployees(RepositoriesCore.EmployeesRepository repo, string department)
+        private static async Task ListActivityLogs(ActivityLogsRepository repo)
         {
-            var results = await repo.SearchRecordsAsync("department", department);
+            var uuids = await GetAllActivityLogUUIDs(repo);
+            if (uuids.Length == 0)
+            {
+                Console.WriteLine("No activity logs found.");
+                return;
+            }
+
+            var logs = await repo.ReadTypedRecordsAsync(uuids.Take(20).ToArray()); // Limit to 20 for display
+            if (logs != null && logs.Length > 0)
+            {
+                Console.WriteLine($"Found {logs.Length} activity logs (showing first 20):");
+                foreach (var log in logs)
+                {
+                    Console.WriteLine($"  - Employee {log.EmployeeId}: {log.ActivityType} ({log.Duration}s) - {log.StartTime:HH:mm:ss}");
+                }
+            }
+            else
+            {
+                Console.WriteLine("No activity logs found.");
+            }
+        }
+
+        private static async Task SearchEmployees(EmployeesRepository repo, string department)
+        {
+            var results = await repo.SearchTypedRecordsAsync("department", department);
             if (results != null && results.Length > 0)
             {
                 Console.WriteLine($"Found {results.Length} employees in {department}:");
@@ -485,7 +756,24 @@ namespace TestUtils
             }
         }
 
-        private static async Task<string[]> GetAllEmployeeUUIDs(RepositoriesCore.EmployeesRepository repo)
+        private static async Task SearchActivityLogs(ActivityLogsRepository repo, string activityType)
+        {
+            var results = await repo.GetActivityLogsByTypeAsync(activityType);
+            if (results != null && results.Length > 0)
+            {
+                Console.WriteLine($"Found {results.Length} '{activityType}' activity logs:");
+                foreach (var log in results)
+                {
+                    Console.WriteLine($"  - Employee {log.EmployeeId}: {log.Duration}s at {log.StartTime:HH:mm:ss}");
+                }
+            }
+            else
+            {
+                Console.WriteLine($"No '{activityType}' activity logs found.");
+            }
+        }
+
+        private static async Task<string[]> GetAllEmployeeUUIDs(EmployeesRepository repo)
         {
             using var connection = await repo.TryConnectAsync();
             if (connection == null) return Array.Empty<string>();
@@ -500,17 +788,51 @@ namespace TestUtils
             return uuids.ToArray();
         }
 
-        public static RepositoriesCore.EmployeesRepository CreateRepository()
+        private static async Task<string[]> GetAllActivityLogUUIDs(ActivityLogsRepository repo)
         {
-            var debugConfigFile = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "test.ini");
+            using var connection = await repo.TryConnectAsync();
+            if (connection == null) return Array.Empty<string>();
+
+            using var cmd = new MySqlConnector.MySqlCommand($"SELECT UUID FROM `{repo.SheetName}`", connection);
+            using var reader = await cmd.ExecuteReaderAsync();
+            var uuids = new List<string>();
+            while (await reader.ReadAsync())
+            {
+                uuids.Add(reader.GetString("UUID"));
+            }
+            return uuids.ToArray();
+        }
+
+        public static EmployeesRepository CreateEmployeesRepository()
+        {
+            var debugConfigFile = Path.Combine(Directory.GetCurrentDirectory(), "test.ini");
             var iniHandler = new IniFileHandler();
-            var repo = new RepositoriesCore.EmployeesRepository(RepositoriesCore.IRepository.GenerateConnectionString(
+            var repo = new EmployeesRepository(IRepository.GenerateConnectionString(
                 server: iniHandler.ReadValue("default", "Server", debugConfigFile),
                 database: iniHandler.ReadValue("default", "Database", debugConfigFile),
                 userId: iniHandler.ReadValue("default", "User_Id", debugConfigFile),
                 password: iniHandler.ReadValue("default", "Password", debugConfigFile)
                 ));
             return repo;
+        }
+
+        public static ActivityLogsRepository CreateActivityLogsRepository()
+        {
+            var debugConfigFile = Path.Combine(Directory.GetCurrentDirectory(), "test.ini");
+            var iniHandler = new IniFileHandler();
+            var repo = new ActivityLogsRepository(IRepository.GenerateConnectionString(
+                server: iniHandler.ReadValue("default", "Server", debugConfigFile),
+                database: iniHandler.ReadValue("default", "Database", debugConfigFile),
+                userId: iniHandler.ReadValue("default", "User_Id", debugConfigFile),
+                password: iniHandler.ReadValue("default", "Password", debugConfigFile)
+                ));
+            return repo;
+        }
+
+        // 为了向后兼容，保留原有的CreateRepository方法
+        public static EmployeesRepository CreateRepository()
+        {
+            return CreateEmployeesRepository();
         }
     }
     

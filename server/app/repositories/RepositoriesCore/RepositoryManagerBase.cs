@@ -1,13 +1,6 @@
-﻿using Microsoft.Identity.Client;
-using MySqlConnector;
-using RepositoriesCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using MySqlConnector;
 using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
-using System.Text.Json;
+
 namespace RepositoriesCore
 {
     public abstract partial class RepositoryManagerBase : IRepository, IDisposable
@@ -43,12 +36,6 @@ namespace RepositoriesCore
         }
 
         public string SheetName => _sheetName;
-
-        // Methods implementation
-        public virtual IRepository Clone()
-        {
-            return (IRepository)MemberwiseClone();
-        }
 
         // 创建并返回新的数据库连接，连接失败返回 null
         public virtual async Task<MySqlConnection?> TryConnectAsync()
@@ -317,50 +304,68 @@ namespace RepositoriesCore
         {
             using var connection = await TryConnectAsync() ?? throw new InvalidOperationException("Cannot establish database connection.");
             if (string.IsNullOrWhiteSpace(UUID) || record == null || record.Count == 0)
-                throw new ArgumentException($"Unexpected paraments: {UUID}, {record}");
+                throw new ArgumentException($"Unexpected parameters: {UUID}, {record}");
+                
             var command = new StringBuilder();
             command.AppendLine($"UPDATE `{SheetName}` SET ");
             var setClauses = new List<string>();
-            foreach (var col in DatabaseDefinition)
+            
+            // 只更新记录中实际包含的列，而不是所有列
+            foreach (var kvp in record)
             {
-                if (col.IsPrimaryKey) continue; // 跳过主键列
-                if (record.TryGetValue(col.Name, out var value))
+                var columnName = kvp.Key;
+                var value = kvp.Value;
+                
+                // 跳过主键列
+                var columnDef = DatabaseDefinition.FirstOrDefault(c => c.Name == columnName);
+                if (columnDef?.IsPrimaryKey == true) continue;
+                
+                if (value is string strVal)
                 {
-                    if (value is string strVal)
+                    // 对字符串进行转义
+                    strVal = strVal.Replace("'", "''");
+                    setClauses.Add($"`{columnName}` = '{strVal}'");
+                }
+                else if (value is bool boolVal)
+                {
+                    setClauses.Add($"`{columnName}` = {(boolVal ? "1" : "0")}");
+                }
+                else if (value is DateTime dateTimeVal)
+                {
+                    setClauses.Add($"`{columnName}` = '{dateTimeVal:yyyy-MM-dd HH:mm:ss}'");
+                }
+                else if (value != null)
+                {
+                    setClauses.Add($"`{columnName}` = {value}");
+                }
+                else
+                {
+                    // 只有当列允许为 NULL 时才设置为 NULL
+                    if (columnDef?.IsNullable == true)
                     {
-                        // 对字符串进行转义
-                        strVal = strVal.Replace("'", "''");
-                        setClauses.Add($"`{col.Name}` = '{strVal}'");
-                    }
-                    else if (value is bool boolVal)
-                    {
-                        setClauses.Add($"`{col.Name}` = {(boolVal ? "1" : "0")}");
-                    }
-                    else if (value is DateTime dateTimeVal)
-                    {
-                        setClauses.Add($"`{col.Name}` = '{dateTimeVal:yyyy-MM-dd HH:mm:ss}'");
-                    }
-                    else if (value != null)
-                    {
-                        setClauses.Add($"`{col.Name}` = {value}");
-                    }
-                    else
-                    {
-                        setClauses.Add($"`{col.Name}` = NULL");
+                        setClauses.Add($"`{columnName}` = NULL");
                     }
                 }
             }
+            
+            if (setClauses.Count == 0)
+            {
+                return false; // 没有要更新的列
+            }
+            
             command.AppendLine(string.Join(", ", setClauses));
             command.AppendLine($" WHERE `UUID` = '{UUID}';");
+            
             using var cmd = new MySqlCommand(command.ToString(), connection);
             var affectedRows = await cmd.ExecuteNonQueryAsync();
             return affectedRows == 1;
         }
         public virtual async Task<string[]?> SearchRecordsAsync(string searchTarget, object content)
         {
-            var connection = await TryConnectAsync() ?? throw new InvalidOperationException("Cannot establish database connection.");
+            using var connection = await TryConnectAsync() ?? throw new InvalidOperationException("Cannot establish database connection.");
             if (string.IsNullOrWhiteSpace(searchTarget) || content == null)
-                throw new ArgumentException($"Unexpected paraments: {searchTarget}, {content}");
+                throw new ArgumentException($"Unexpected parameters: {searchTarget}, {content}");
+                
             var commandString = new StringBuilder();
             commandString.AppendLine($"SELECT * FROM `{SheetName}` WHERE `{searchTarget}` = ");
             if (content is string strVal)
@@ -381,10 +386,12 @@ namespace RepositoriesCore
             {
                 commandString.AppendLine($"{content};");
             }
+            
             using var cmd = new MySqlCommand(commandString.ToString(), connection);
             using var reader = await cmd.ExecuteReaderAsync();
             var results = new List<string>();
-            while (reader.Read())
+            
+            while (await reader.ReadAsync())
             {
                 var record = new Dictionary<string, object?>();
                 foreach (var col in DatabaseDefinition)
@@ -395,6 +402,7 @@ namespace RepositoriesCore
                 var jsonString = await IRepository.SerializeToJsonAsync(record);
                 results.Add(jsonString);
             }
+            
             return results?.ToArray();
         }
     }

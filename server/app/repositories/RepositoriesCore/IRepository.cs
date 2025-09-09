@@ -1,6 +1,5 @@
 ﻿using MySqlConnector;
 using System.Text.Json;
-using System.Threading.Tasks;
 
 namespace RepositoriesCore
 {
@@ -10,7 +9,6 @@ namespace RepositoriesCore
         string ConnectionString { get; set; } // 数据库连接字符串
         string SheetName { get; } // 数据库表名称
         void Dispose(); // 释放资源
-        IRepository Clone(); // 克隆当前实例
         Task<bool> DatabaseIsInitializedAsync(); // 检查数据库表是否已初始化
         Task<bool> InitializeDatabaseAsync(IEnumerable<ColumnDefinition> columns); // 初始化数据库表
         Task<MySqlConnection?> TryConnectAsync(); // 尝试连接数据库，返回 MySqlConnection 或 null

@@ -1,16 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Text.Json;
-using System.IO;
-using ZstdSharp.Unsafe;
-using System.Reflection.Metadata.Ecma335;
+﻿using System.Text.Json;
 
 namespace RepositoriesCore
 {
-    // Simple in-memory implementation placeholder (empty implementations)
     public partial class EmployeesRepository : RepositoryManagerBase
     {
         public EmployeesRepository(string? connectionString) : base(connectionString, "Employees")
@@ -23,10 +14,28 @@ namespace RepositoriesCore
             var result = await base.ReadRecordsAsync(UUIDs);
             if (result == null || result.Length == 0)
                 return null;
+                
             var employeeRecords = new List<EmployeeRecord>();
             foreach (var item in result)
             {
-                employeeRecords.Add(JsonSerializer.Deserialize<EmployeeRecord>(item) ?? throw new JsonException("Failed to deserialize record."));
+                try
+                {
+                    // 先反序列化为字典
+                    var dict = JsonSerializer.Deserialize<Dictionary<string, object?>>(item);
+                    if (dict != null)
+                    {
+                        // 手动映射到 EmployeeRecord
+                        var employee = DictToRecord(dict);
+                        if (employee != null)
+                        {
+                            employeeRecords.Add(employee);
+                        }
+                    }
+                }
+                catch (JsonException ex)
+                {
+                    throw new JsonException($"Failed to deserialize record: {item}", ex);
+                }
             }
             return employeeRecords.ToArray();
         }
@@ -55,7 +64,24 @@ namespace RepositoriesCore
                 var employeeRecords = new List<EmployeeRecord>();
                 foreach (var item in result)
                 {
-                    employeeRecords.Add(JsonSerializer.Deserialize<EmployeeRecord>(item) ?? throw new JsonException("Failed to deserialize record."));
+                    try
+                    {
+                        // 先反序列化为字典
+                        var dict = JsonSerializer.Deserialize<Dictionary<string, object?>>(item);
+                        if (dict != null)
+                        {
+                            // 手动映射到 EmployeeRecord
+                            var employee = DictToRecord(dict);
+                            if (employee != null)
+                            {
+                                employeeRecords.Add(employee);
+                            }
+                        }
+                    }
+                    catch (JsonException ex)
+                    {
+                        throw new JsonException($"Failed to deserialize record: {item}", ex);
+                    }
                 }
                 return employeeRecords.ToArray();
             }
@@ -100,6 +126,55 @@ namespace RepositoriesCore
                 { "created_at", record.CreatedAt },
                 { "updated_at", record.UpdatedAt }
             };
+        }
+
+        public static EmployeeRecord? DictToRecord(Dictionary<string, object?>? dict)
+        {
+            if (dict == null) return null;
+            
+            try
+            {
+                // 安全地获取值并转换类型
+                var uuid = GetStringValue(dict, "UUID") ?? "";
+                var userId = GetStringValue(dict, "user_id") ?? "";
+                var name = GetStringValue(dict, "name") ?? "";
+                var department = GetStringValue(dict, "department") ?? "";
+                var workstationId = GetStringValue(dict, "workstation_id");
+                var preference = GetStringValue(dict, "preference");
+                var createdAt = GetDateTimeValue(dict, "created_at") ?? DateTime.Now;
+                var updatedAt = GetDateTimeValue(dict, "updated_at") ?? DateTime.Now;
+                
+                return new EmployeeRecord(uuid, userId, name, department, workstationId, preference, createdAt, updatedAt);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to convert dictionary to EmployeeRecord: {ex.Message}", ex);
+            }
+        }
+
+        private static string? GetStringValue(Dictionary<string, object?> dict, string key)
+        {
+            if (dict.TryGetValue(key, out var value) && value != null)
+            {
+                return value.ToString();
+            }
+            return null;
+        }
+
+        private static DateTime? GetDateTimeValue(Dictionary<string, object?> dict, string key)
+        {
+            if (dict.TryGetValue(key, out var value) && value != null)
+            {
+                if (value is DateTime dateTime)
+                {
+                    return dateTime;
+                }
+                if (DateTime.TryParse(value.ToString(), out var parsedDateTime))
+                {
+                    return parsedDateTime;
+                }
+            }
+            return null;
         }
     }
 }

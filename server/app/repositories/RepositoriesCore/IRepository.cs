@@ -8,16 +8,12 @@ namespace RepositoriesCore
         string ConnectionString { get; set; }
         string SheetName { get; }
         // Sync versions
-        bool IsConnected();
-        void Disconnect();
         void Dispose();
         IRepository Clone();
         Task<bool> DatabaseIsInitializedAsync();
         Task<bool> InitializeDatabaseAsync(IEnumerable<ColumnDefinition> columns);
         // Async versions
-        Task<bool> ConnectAsync(string connectionString);
-        Task<bool> ConnectAsync();
-        Task<bool> TryConnectAsync();
+        Task<MySqlConnection?> TryConnectAsync();
         Task<bool> AddNewRecordsAsync(string[] records);
         Task<bool> UpdateRecordAsync(string UUID, string record);
         Task<string[]?> ReadRecordsAsync(string[] UUIDs);

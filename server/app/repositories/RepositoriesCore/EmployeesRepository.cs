@@ -29,15 +29,16 @@ namespace RepositoriesCore
 
         public override async Task<string[]?> ReadRecordsAsync(string[] UUIDs)
         {
-            if (!await EnsureConnectionAvailableAsync()) 
-                throw new InvalidOperationException("Cannot establish or verify database connection.");
+            using var connection = await TryConnectAsync();
+            if (connection == null) 
+                throw new InvalidOperationException("Cannot establish database connection.");
             
             var sqlCommand = $"SELECT * FROM `{SheetName}` WHERE `UUID` IN ({string.Join(",", UUIDs.Select(id => $"'{id}'"))});";
             
             try
             {
-                // 正确使用 using 语句来管理资源
-                using var cmd = new MySqlConnector.MySqlCommand(sqlCommand, _connection);
+                // 使用 using 语句来管理资源
+                using var cmd = new MySqlConnector.MySqlCommand(sqlCommand, connection);
                 using var reader = await cmd.ExecuteReaderAsync();
                 var results = new List<string>();
                 
@@ -48,79 +49,76 @@ namespace RepositoriesCore
                     {
                         record[col.Name] = reader[col.Name] is DBNull ? null : reader[col.Name];
                     }
-
+                    
                     // 使用异步 JSON 序列化
-                    var jsonString = await Task.Run(async () =>
-                    {
-                        using var stream = new MemoryStream();
-                        await JsonSerializer.SerializeAsync(stream, record, new JsonSerializerOptions
-                        {
-                            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                            WriteIndented = false
-                        });
-
-                        stream.Position = 0;
-                        using var reader = new StreamReader(stream);
-                        return await reader.ReadToEndAsync();
-                    });
+                    var jsonString = await SerializeToJsonAsync(record);
                     results.Add(jsonString);
                 }
                 
                 return results?.ToArray();
             }
-            catch (InvalidOperationException ex) when (ex.Message.Contains("already in use"))
+            catch (MySqlConnector.MySqlException ex)
             {
-                // 如果连接被占用，等待并重试
-                await Task.Delay(50);
-                using var cmd = new MySqlConnector.MySqlCommand(sqlCommand, _connection);
-                using var reader = await cmd.ExecuteReaderAsync();
-                var results = new List<string>();
-                
-                while (await reader.ReadAsync())
-                {
-                    var record = new Dictionary<string, object?>();
-                    foreach (var col in DatabaseDefinition)
-                    {
-                        record[col.Name] = reader[col.Name] is DBNull ? null : reader[col.Name];
-                    }
-
-                    var jsonString = await Task.Run(async () =>
-                    {
-                        using var stream = new MemoryStream();
-                        await JsonSerializer.SerializeAsync(stream, record, new JsonSerializerOptions
-                        {
-                            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                            WriteIndented = false
-                        });
-
-                        stream.Position = 0;
-                        using var reader = new StreamReader(stream);
-                        return await reader.ReadToEndAsync();
-                    });
-                    results.Add(jsonString);
-                }
-                
-                return results?.ToArray();
+                throw new InvalidOperationException($"Failed to read records. MySQL error {ex.Number}: {ex.Message}", ex);
             }
         }
 
-        public override Task<bool> AddNewRecordsAsync(string[] records)
+        private static async Task<string> SerializeToJsonAsync(Dictionary<string, object?> record)
         {
-            throw new NotImplementedException();
+            using var stream = new MemoryStream();
+            await JsonSerializer.SerializeAsync(stream, record, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                WriteIndented = false
+            });
+            
+            stream.Position = 0;
+            using var reader = new StreamReader(stream);
+            return await reader.ReadToEndAsync();
         }
 
-        public override Task<bool> UpdateRecordAsync(string UUID, string record)
+        public override async Task<bool> AddNewRecordsAsync(string[] records)
         {
-            throw new NotImplementedException();
-        }
-        public override Task<bool> DeleteRecordsAsync(string[] UUIDs)
-        {
-            throw new NotImplementedException();
+            using var connection = await TryConnectAsync();
+            if (connection == null) 
+                throw new InvalidOperationException("Cannot establish database connection.");
+            
+            // TODO: 实现添加记录逻辑
+            await Task.CompletedTask;
+            return false;
         }
 
-        public override Task<string[]?> SearchRecordsAsync(string searchTarget, object content)
+        public override async Task<bool> UpdateRecordAsync(string UUID, string record)
         {
-            throw new NotImplementedException();
+            using var connection = await TryConnectAsync();
+            if (connection == null) 
+                throw new InvalidOperationException("Cannot establish database connection.");
+            
+            // TODO: 实现更新记录逻辑
+            await Task.CompletedTask;
+            return false;
+        }
+        
+        public override async Task<bool> DeleteRecordsAsync(string[] UUIDs)
+        {
+            using var connection = await TryConnectAsync();
+            if (connection == null) 
+                throw new InvalidOperationException("Cannot establish database connection.");
+            
+            // TODO: 实现删除记录逻辑
+            await Task.CompletedTask;
+            return false;
+        }
+
+        public override async Task<string[]?> SearchRecordsAsync(string searchTarget, object content)
+        {
+            using var connection = await TryConnectAsync();
+            if (connection == null) 
+                throw new InvalidOperationException("Cannot establish database connection.");
+            
+            // TODO: 实现搜索记录逻辑
+            await Task.CompletedTask;
+            return null;
         }
     }
 }

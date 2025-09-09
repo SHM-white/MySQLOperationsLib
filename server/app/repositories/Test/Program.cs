@@ -1,4 +1,5 @@
-﻿using System;
+﻿using RepositoriesCore;
+using System;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
@@ -12,31 +13,29 @@ namespace TestUtils
             try 
             {                
                 var repo = CreateRepository();
-                Console.WriteLine($"Repo1 is connected: {repo.IsConnected()}");
-                Console.WriteLine($"Repo1 IsInitialized: {await repo.DatabaseIsInitializedAsync()}");
-                
-                var repo2 = await CreateRepositoryAsync();
-                Console.WriteLine($"Repo2 is connected: {repo2.IsConnected()}");
-                Console.WriteLine($"Repo2 IsInitialized: {await repo2.DatabaseIsInitializedAsync()}");
+                Console.WriteLine($"Repo connection string valid: {IRepository.IsValidConnectionString(repo.ConnectionString)}");
+                Console.WriteLine($"Repo IsInitialized: {await repo.DatabaseIsInitializedAsync()}");
+
+                Console.WriteLine($"Repo sheet name: {repo.SheetName}");
                 
                 if (!await repo.DatabaseIsInitializedAsync())
                 {
-                    Console.WriteLine("Initializing database with fixed SQL generation...");
+                    Console.WriteLine("Initializing database with new connection logic...");
                     await repo.InitializeDatabaseAsync(repo.DatabaseDefinition);
-                    Console.WriteLine($"Repo1 initialized the database successfully.");
+                    Console.WriteLine($"Repo initialized the database successfully.");
                 }
 
-                // 测试 MySqlConnection 重用修复 - 并发操作测试
-                Console.WriteLine("\nTesting MySqlConnection reuse fix with concurrent operations...");
+                // 测试新的连接逻辑 - 并发操作测试
+                Console.WriteLine("\nTesting new connection logic with concurrent operations...");
                 await TestConcurrentOperations(repo);
 
                 // 测试异步读取记录（使用异步 JSON 序列化）
-                Console.WriteLine("\nTesting async ReadRecordsAsync with JSON serialization...");
+                Console.WriteLine("\nTesting async ReadRecordsAsync with new connection management...");
                 try
                 {
                     var testUUIDs = new[] { "test-uuid-1", "test-uuid-2" };
                     var records = await repo.ReadRecordsAsync(testUUIDs);
-                    Console.WriteLine($"Read {records?.Length ?? 0} records successfully using async JSON serialization.");
+                    Console.WriteLine($"Read {records?.Length ?? 0} records successfully using new connection logic.");
                     if (records != null && records.Length > 0)
                     {
                         Console.WriteLine($"First record: {records[0]}");
@@ -56,6 +55,22 @@ namespace TestUtils
                         $"Default: {col.DefaultValue ?? "null"})");
                 }
 
+                // 测试 TryConnectAsync 返回 MySqlConnection?
+                Console.WriteLine("\nTesting TryConnectAsync method:");
+                using var connection = await repo.TryConnectAsync();
+                if (connection != null)
+                {
+                    Console.WriteLine($"TryConnectAsync returned a valid connection. State: {connection.State}");
+                    // 测试连接
+                    using var testCmd = new MySqlConnector.MySqlCommand("SELECT 1", connection);
+                    var result = await testCmd.ExecuteScalarAsync();
+                    Console.WriteLine($"Test query result: {result}");
+                }
+                else
+                {
+                    Console.WriteLine("TryConnectAsync returned null - connection failed");
+                }
+
                 Console.WriteLine($"\nType 'exit' to quit, or enter SQL commands to test:");
                 while (true)
                 {
@@ -66,6 +81,12 @@ namespace TestUtils
                     if (input.Equals("test", StringComparison.OrdinalIgnoreCase))
                     {
                         await TestConcurrentOperations(repo);
+                        continue;
+                    }
+                    if (input.Equals("conn", StringComparison.OrdinalIgnoreCase))
+                    {
+                        using var conn = await repo.TryConnectAsync();
+                        Console.WriteLine($"Connection test: {(conn != null ? "Success" : "Failed")}");
                         continue;
                     }
                     
@@ -89,7 +110,7 @@ namespace TestUtils
 
         private static async Task TestConcurrentOperations(RepositoriesCore.EmployeesRepository repo)
         {
-            Console.WriteLine("Starting concurrent operations test...");
+            Console.WriteLine("Starting concurrent operations test with new connection logic...");
             var tasks = new List<Task>();
             
             // 创建多个并发任务
@@ -103,6 +124,17 @@ namespace TestUtils
                         // 测试并发查询操作
                         var result = await repo.ExecuteCommandAsync("SELECT 1");
                         Console.WriteLine($"Task {taskId}: Query result = {result}");
+                        
+                        // 测试并发连接获取
+                        using var connection = await repo.TryConnectAsync();
+                        if (connection != null)
+                        {
+                            Console.WriteLine($"Task {taskId}: Got connection successfully");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"Task {taskId}: Failed to get connection");
+                        }
                         
                         // 测试并发读取操作
                         var records = await repo.ReadRecordsAsync(new[] { $"test-{taskId}" });
@@ -129,22 +161,6 @@ namespace TestUtils
                 userId: iniHandler.ReadValue("default", "User_Id", debugConfigFile),
                 password: iniHandler.ReadValue("default", "Password", debugConfigFile)
                 ));
-            return repo;
-        }
-
-        public static async Task<RepositoriesCore.EmployeesRepository> CreateRepositoryAsync()
-        {
-            var debugConfigFile = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "test.ini");
-            var iniHandler = new IniFileHandler();
-            var connectionString = RepositoriesCore.IRepository.GenerateConnectionString(
-                server: iniHandler.ReadValue("default", "Server", debugConfigFile),
-                database: iniHandler.ReadValue("default", "Database", debugConfigFile),
-                userId: iniHandler.ReadValue("default", "User_Id", debugConfigFile),
-                password: iniHandler.ReadValue("default", "Password", debugConfigFile)
-                );
-            
-            var repo = new RepositoriesCore.EmployeesRepository(null); // 先创建不连接
-            await repo.ConnectAsync(connectionString); // 异步连接
             return repo;
         }
     }

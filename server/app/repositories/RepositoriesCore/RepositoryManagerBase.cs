@@ -15,17 +15,15 @@ namespace RepositoriesCore
         {
             _connectionString = connectionString ?? string.Empty;
             _sheetName = sheetName;
-            Task.Run(async () => await ConnectAsync()).Wait();
         }
         ~RepositoryManagerBase()
         {
-            Dispose(false);
         }
 
         // Properties and fields
         private string _connectionString;
         protected string _sheetName;
-        protected MySqlConnection? _connection;
+        
         public string ConnectionString {
             get => _connectionString;
             set {
@@ -36,7 +34,7 @@ namespace RepositoriesCore
                 else throw new ArgumentException($"Connection string is illegal: {value}");
             }
         }
-        protected MySqlConnection? Connection => _connection; // 连接实例不暴露给外部
+
         public string SheetName => _sheetName;
 
         // Methods implementation
@@ -44,92 +42,73 @@ namespace RepositoriesCore
         {
             return (IRepository)MemberwiseClone();
         }
-        public virtual async Task<bool> ConnectAsync(string connectionString)
-        {
-            this.ConnectionString = connectionString;
-            return await ConnectAsync();
-        }
-        public virtual async Task<bool> ConnectAsync()
+
+        // 创建并返回新的数据库连接，连接失败返回 null
+        public virtual async Task<MySqlConnection?> TryConnectAsync()
         {
             if (string.IsNullOrEmpty(ConnectionString))
             {
-                return false;
+                return null;
             }
             
             try
             {
-                // 如果连接已存在但状态异常，先清理
-                if (_connection != null && _connection.State == System.Data.ConnectionState.Broken)
-                {
-                    _connection.Dispose();
-                    _connection = null;
-                }
+                var connection = new MySqlConnection(ConnectionString);
+                await connection.OpenAsync();
                 
-                if (_connection is null)
+                // 验证连接是否真的打开了
+                if (connection.State == System.Data.ConnectionState.Open)
                 {
-                    _connection = new MySqlConnection(ConnectionString);
+                    return connection;
                 }
-                
-                if (_connection.State != System.Data.ConnectionState.Open)
+                else
                 {
-                    await _connection.OpenAsync();
+                    connection.Dispose();
+                    return null;
                 }
-                
-                return _connection.State == System.Data.ConnectionState.Open;
             }
-            catch (MySqlException ex)
+            catch (MySqlException)
             {
-                // 连接失败时清理资源
-                if (_connection != null)
-                {
-                    _connection.Dispose();
-                    _connection = null;
-                }
-                throw new InvalidOperationException($"Failed to connect to database. MySQL error {ex.Number}: {ex.Message}", ex);
+                // 连接失败，返回 null
+                return null;
+            }
+            catch (Exception)
+            {
+                // 其他异常，也返回 null
+                return null;
             }
         }
-        public virtual void Disconnect()
-        {
-            if (_connection is not null)
-            {
-                _connection.Close();
-                _connection.Dispose();
-                _connection = null;
-            }
-        }
+        
         public void Dispose()
         {
-            Dispose(true);
             GC.SuppressFinalize(this);
         }
-        protected virtual void Dispose(bool disposing)
-        {
-            if (disposing)
-            {
-                Disconnect();
-            }
-            else
-            {
-                try { Disconnect(); } catch { }
-            }
-        }
+        
         public virtual async Task<bool> InitializeDatabaseAsync(IEnumerable<ColumnDefinition> columns)
         {
             if (columns is null) throw new ArgumentNullException(nameof(columns));
             var cols = columns.ToList();
             if (!cols.Any()) throw new ArgumentException("No column definitions provided.");
-            if (!await TryConnectAsync()) throw new InvalidOperationException("Not connected to the database.");
 
-            if (string.IsNullOrEmpty(_sheetName))
-                throw new ArgumentException($"Invalid table name: {_sheetName}");
+            using var connection = await TryConnectAsync();
+            if (connection == null) throw new InvalidOperationException("Not connected to the database.");
+
+            if (string.IsNullOrEmpty(SheetName))
+                throw new ArgumentException($"Invalid table name: {SheetName}");
+
+            // 先删除表
+            using (var dropCmd = new MySqlCommand($"DROP TABLE IF EXISTS `{SheetName}`", connection))
+            {
+                await dropCmd.ExecuteNonQueryAsync();
+            }
 
             for (int i = 0; i < cols.Count; i++)
             {
                 var c = cols[i];
                 if (!c.Name.IsValidIdentifier())
                     throw new ArgumentException($"Invalid column name: {c.Name}");
-                // 自动主键推断：如果没有主键且列名为 UUID
             }
+            
             if (!cols.Any(c => c.IsPrimaryKey))
             {
                 var uuid = cols.FirstOrDefault(c => string.Equals(c.Name, "UUID", StringComparison.OrdinalIgnoreCase));
@@ -197,11 +176,11 @@ namespace RepositoriesCore
                 
                 if (c.IsUnique && !c.IsPrimaryKey)
                 {
-                    uniqueKeys.Add($"UNIQUE KEY `UK_{_sheetName}_{c.Name}` (`{c.Name}`)");
+                    uniqueKeys.Add($"UNIQUE KEY `UK_{SheetName}_{c.Name}` (`{c.Name}`)");
                 }
                 if (c.IsIndexed && !c.IsPrimaryKey && !c.IsUnique)
                 {
-                    indexes.Add($"KEY `IDX_{_sheetName}_{c.Name}` (`{c.Name}`)");
+                    indexes.Add($"KEY `IDX_{SheetName}_{c.Name}` (`{c.Name}`)");
                 }
             }
 
@@ -213,12 +192,12 @@ namespace RepositoriesCore
             allConstraints.AddRange(uniqueKeys);
             allConstraints.AddRange(indexes);
 
-            string createTableSql = $@"CREATE TABLE IF NOT EXISTS `{_sheetName}` (
+            string createTableSql = $@"CREATE TABLE IF NOT EXISTS `{SheetName}` (
 {string.Join(",\n", columnSqlParts)},
 {string.Join(",\n", allConstraints)}
 ) DEFAULT CHARSET=utf8mb4;";
 
-            using var cmd = new MySqlCommand(createTableSql, _connection);
+            using var cmd = new MySqlCommand(createTableSql, connection);
             await cmd.ExecuteNonQueryAsync();
             return true;
         }
@@ -229,107 +208,48 @@ namespace RepositoriesCore
             return type == DbColumnType.Int32 || type == DbColumnType.Int64 || type == DbColumnType.Decimal;
         }
 
-        public virtual bool IsConnected()
-        {
-            try
-            {
-                return _connection is not null && 
-                       _connection.State == System.Data.ConnectionState.Open;
-            }
-            catch
-            {
-                // 如果检查连接状态时出现异常，认为连接不可用
-                return false;
-            }
-        }
-
         public virtual async Task<bool> DatabaseIsInitializedAsync()
         {
             // 校验基础参数
-            if (string.IsNullOrWhiteSpace(_sheetName))
+            if (string.IsNullOrWhiteSpace(SheetName))
                 throw new InvalidOperationException("SheetName is not set.");
 
-            // 若尚未连接则尝试连接（避免调用方忘记先 Connect）
-            if (!await TryConnectAsync()) throw new InvalidOperationException("Not connected to the database.");
+            using var connection = await TryConnectAsync();
+            if (connection is null) throw new InvalidOperationException("Not connected to the database.");
 
             // 使用 INFORMATION_SCHEMA 精确判断，避免 LIKE 误判及特殊字符问题
             const string sql = @"SELECT 1 FROM INFORMATION_SCHEMA.TABLES 
                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = @table LIMIT 1;";
             try
             {
-                using var cmd = new MySqlCommand(sql, _connection);
-                cmd.Parameters.AddWithValue("@table", _sheetName);
+                using var cmd = new MySqlCommand(sql, connection);
+                cmd.Parameters.AddWithValue("@table", SheetName);
                 var result = await cmd.ExecuteScalarAsync();
                 return result is not null; // 有行即存在
             }
             catch (MySqlException ex)
             {
-                throw new InvalidOperationException($"Failed to check table existence for '{_sheetName}'. MySQL error {ex.Number}: {ex.Message}", ex);
+                throw new InvalidOperationException($"Failed to check table existence for '{SheetName}'. MySQL error {ex.Number}: {ex.Message}", ex);
             }
         }
 
         public virtual async Task<string> ExecuteCommandAsync(string commandText)
         {
-            // 确保连接可用
-            if (!await EnsureConnectionAvailableAsync())
+            using var connection = await TryConnectAsync();
+            if (connection is null)
             {
-                throw new InvalidOperationException("Cannot establish or verify database connection.");
+                throw new InvalidOperationException("Cannot establish database connection.");
             }
             
             try
             {
-                using var command = new MySqlCommand(commandText, _connection);
-                var result = await command.ExecuteScalarAsync();
-                return result?.ToString() ?? string.Empty;
-            }
-            catch (InvalidOperationException ex) when (ex.Message.Contains("already in use"))
-            {
-                // 如果连接仍然被占用，等待并重试一次
-                await Task.Delay(50);
-                using var command = new MySqlCommand(commandText, _connection);
+                using var command = new MySqlCommand(commandText, connection);
                 var result = await command.ExecuteScalarAsync();
                 return result?.ToString() ?? string.Empty;
             }
             catch (MySqlException ex)
             {
                 throw new InvalidOperationException($"Failed to execute command. MySQL error {ex.Number}: {ex.Message}", ex);
-            }
-        }
-
-        public virtual async Task<bool> TryConnectAsync()
-        {
-            if (!IsConnected())
-            {
-                return await ConnectAsync();
-            }
-            return IsConnected();
-        }
-
-        // 辅助方法：确保连接可用并且没有被其他操作占用
-        protected virtual async Task<bool> EnsureConnectionAvailableAsync()
-        {
-            if (!IsConnected())
-            {
-                return await ConnectAsync();
-            }
-
-            // 检查连接是否被占用（通过尝试执行一个简单的查询）
-            try
-            {
-                using var testCmd = new MySqlCommand("SELECT 1", _connection);
-                await testCmd.ExecuteScalarAsync();
-                return true;
-            }
-            catch (InvalidOperationException ex) when (ex.Message.Contains("already in use"))
-            {
-                // 连接被占用，等待一小段时间后重试
-                await Task.Delay(10);
-                return false;
-            }
-            catch
-            {
-                // 其他错误，尝试重新连接
-                return await ConnectAsync();
             }
         }
 
@@ -342,6 +262,5 @@ namespace RepositoriesCore
 
         // Database structure definition
         public abstract List<ColumnDefinition> DatabaseDefinition { get; }
-
     }
 }

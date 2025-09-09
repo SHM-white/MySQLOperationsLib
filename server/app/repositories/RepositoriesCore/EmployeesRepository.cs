@@ -32,10 +32,8 @@ namespace RepositoriesCore
         
         public override async Task<bool> AddNewRecordsAsync(string[] records)
         {
-            using var connection = await TryConnectAsync();
-            if (connection == null) 
-                throw new InvalidOperationException("Cannot establish database connection.");
-            
+            using var connection = await TryConnectAsync() ?? throw new InvalidOperationException("Cannot establish database connection.");
+
             // TODO: 实现添加记录逻辑
             await Task.CompletedTask;
             return false;
@@ -43,10 +41,8 @@ namespace RepositoriesCore
 
         public override async Task<bool> UpdateRecordAsync(string UUID, string record)
         {
-            using var connection = await TryConnectAsync();
-            if (connection == null) 
-                throw new InvalidOperationException("Cannot establish database connection.");
-            
+            using var connection = await TryConnectAsync() ?? throw new InvalidOperationException("Cannot establish database connection.");
+
             // TODO: 实现更新记录逻辑
             await Task.CompletedTask;
             return false;

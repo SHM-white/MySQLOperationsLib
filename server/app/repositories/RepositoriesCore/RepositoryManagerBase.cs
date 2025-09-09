@@ -7,18 +7,14 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using System.Text.Json;
 namespace RepositoriesCore
 {
     public abstract partial class RepositoryManagerBase : IRepository, IDisposable
     {
-        // Abstract methods to be implemented by subclasses
-        public abstract Task<bool> AddNewRecordsAsync(string[] records);
-        public abstract Task<bool> UpdateRecordAsync(string UUID, string record);
-        public abstract Task<bool> DeleteRecordsAsync(string[] UUIDs);
-        public abstract Task<string[]?> SearchRecordsAsync(string searchTarget, object content);
 
         // Database structure definition
-        public abstract List<ColumnDefinition> DatabaseDefinition { get; }
+        public abstract IEnumerable<ColumnDefinition> DatabaseDefinition { get; }
 
         // Properties and fields
         private string _connectionString;
@@ -32,14 +28,12 @@ namespace RepositoriesCore
             _connectionString = connectionString ?? string.Empty;
             _sheetName = sheetName;
         }
-        ~RepositoryManagerBase()
-        {
-        }
 
-        
-        public string ConnectionString {
+        public string ConnectionString
+        {
             get => _connectionString;
-            set {
+            set
+            {
                 if (IRepository.IsValidConnectionString(value))
                 {
                     _connectionString = value;
@@ -63,12 +57,12 @@ namespace RepositoriesCore
             {
                 return null;
             }
-            
+
             try
             {
                 var connection = new MySqlConnection(ConnectionString);
                 await connection.OpenAsync();
-                
+
                 // 验证连接是否真的打开了
                 if (connection.State == System.Data.ConnectionState.Open)
                 {
@@ -91,21 +85,19 @@ namespace RepositoriesCore
                 return null;
             }
         }
-        
+
         public void Dispose()
         {
             GC.SuppressFinalize(this);
         }
-        
+
         public virtual async Task<bool> InitializeDatabaseAsync(IEnumerable<ColumnDefinition> columns)
         {
             if (columns is null) throw new ArgumentNullException(nameof(columns));
             var cols = columns.ToList();
             if (!cols.Any()) throw new ArgumentException("No column definitions provided.");
 
-            using var connection = await TryConnectAsync();
-            if (connection == null) throw new InvalidOperationException("Not connected to the database.");
-
+            using var connection = await TryConnectAsync() ?? throw new InvalidOperationException("Not connected to the database.");
             if (string.IsNullOrEmpty(SheetName))
                 throw new ArgumentException($"Invalid table name: {SheetName}");
 
@@ -121,7 +113,7 @@ namespace RepositoriesCore
                 if (!c.Name.IsValidIdentifier())
                     throw new ArgumentException($"Invalid column name: {c.Name}");
             }
-            
+
             if (!cols.Any(c => c.IsPrimaryKey))
             {
                 var uuid = cols.FirstOrDefault(c => string.Equals(c.Name, "UUID", StringComparison.OrdinalIgnoreCase));
@@ -146,29 +138,21 @@ namespace RepositoriesCore
             {
                 var type = c.ToMySqlType();
                 var nullStr = c.IsNullable && !c.IsPrimaryKey ? "NULL" : "NOT NULL";
-                
+
                 // AUTO_INCREMENT 只能用于数值类型的主键
                 var autoInc = c.AutoIncrement && c.IsPrimaryKey && IsNumericType(c.Type) ? " AUTO_INCREMENT" : string.Empty;
-                
+
                 // 处理 DEFAULT 值
                 var defaultExpr = string.Empty;
                 if (!string.IsNullOrWhiteSpace(c.DefaultValue))
                 {
-                    if (c.Type == DbColumnType.DateTime)
+                    if (c.Type == DbColumnType.DateTime && c.DefaultValue.Contains("ON UPDATE"))
                     {
-                        // 处理 DateTime 类型的特殊默认值
-                        if (c.DefaultValue.Contains("ON UPDATE"))
+                        // 分离默认值和更新值
+                        var parts = c.DefaultValue.Split(new[] { " ON UPDATE " }, StringSplitOptions.RemoveEmptyEntries);
+                        if (parts.Length == 2)
                         {
-                            // 分离默认值和更新值
-                            var parts = c.DefaultValue.Split(new[] { " ON UPDATE " }, StringSplitOptions.RemoveEmptyEntries);
-                            if (parts.Length == 2)
-                            {
-                                defaultExpr = $" DEFAULT {parts[0]} ON UPDATE {parts[1]}";
-                            }
-                            else
-                            {
-                                defaultExpr = $" DEFAULT {c.DefaultValue}";
-                            }
+                            defaultExpr = $" DEFAULT {parts[0]} ON UPDATE {parts[1]}";
                         }
                         else
                         {
@@ -180,13 +164,13 @@ namespace RepositoriesCore
                         defaultExpr = $" DEFAULT {c.DefaultValue}";
                     }
                 }
-                
+
                 var comment = !string.IsNullOrWhiteSpace(c.Comment) ? $" COMMENT '{c.Comment.Replace("'", "''")}'" : string.Empty;
-                
+
                 // 构建完整的列定义：类型 + NOT NULL/NULL + AUTO_INCREMENT + DEFAULT + COMMENT
                 var columnDef = $"`{c.Name}` {type} {nullStr}{autoInc}{defaultExpr}{comment}".Trim();
                 columnSqlParts.Add(columnDef);
-                
+
                 if (c.IsUnique && !c.IsPrimaryKey)
                 {
                     uniqueKeys.Add($"UNIQUE KEY `UK_{SheetName}_{c.Name}` (`{c.Name}`)");
@@ -227,80 +211,191 @@ namespace RepositoriesCore
             if (string.IsNullOrWhiteSpace(SheetName))
                 throw new InvalidOperationException("SheetName is not set.");
 
-            using var connection = await TryConnectAsync();
-            if (connection is null) throw new InvalidOperationException("Not connected to the database.");
+            using var connection = await TryConnectAsync() ?? throw new InvalidOperationException("Not connected to the database.");
 
             // 使用 INFORMATION_SCHEMA 精确判断，避免 LIKE 误判及特殊字符问题
             const string sql = @"SELECT 1 FROM INFORMATION_SCHEMA.TABLES 
                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = @table LIMIT 1;";
-            try
-            {
-                using var cmd = new MySqlCommand(sql, connection);
-                cmd.Parameters.AddWithValue("@table", SheetName);
-                var result = await cmd.ExecuteScalarAsync();
-                return result is not null; // 有行即存在
-            }
-            catch (MySqlException ex)
-            {
-                throw new InvalidOperationException($"Failed to check table existence for '{SheetName}'. MySQL error {ex.Number}: {ex.Message}", ex);
-            }
+            using var cmd = new MySqlCommand(sql, connection);
+            cmd.Parameters.AddWithValue("@table", SheetName);
+            var result = await cmd.ExecuteScalarAsync();
+            return result is not null; // 有行即存在
         }
 
         public virtual async Task<string> ExecuteCommandAsync(string commandText)
         {
-            using var connection = await TryConnectAsync();
-            if (connection is null)
-            {
-                throw new InvalidOperationException("Cannot establish database connection.");
-            }
-            
-            try
-            {
-                using var command = new MySqlCommand(commandText, connection);
-                var result = await command.ExecuteScalarAsync();
-                return result?.ToString() ?? string.Empty;
-            }
-            catch (MySqlException ex)
-            {
-                throw new InvalidOperationException($"Failed to execute command. MySQL error {ex.Number}: {ex.Message}", ex);
-            }
+            using var connection = await TryConnectAsync() ?? throw new InvalidOperationException("Cannot establish database connection.");
+            using var command = new MySqlCommand(commandText, connection);
+            var result = await command.ExecuteScalarAsync();
+            return result?.ToString() ?? string.Empty;
         }
         public virtual async Task<string[]?> ReadRecordsAsync(string[] UUIDs)
         {
-            using var connection = await TryConnectAsync();
-            if (connection == null)
-                throw new InvalidOperationException("Cannot establish database connection.");
-
+            using var connection = await TryConnectAsync() ?? throw new InvalidOperationException("Cannot establish database connection.");
             var sqlCommand = $"SELECT * FROM `{SheetName}` WHERE `UUID` IN ({string.Join(",", UUIDs.Select(id => $"'{id}'"))});";
 
-            try
+            // 使用 using 语句来管理资源
+            using var cmd = new MySqlConnector.MySqlCommand(sqlCommand, connection);
+            using var reader = await cmd.ExecuteReaderAsync();
+            var results = new List<string>();
+
+            while (await reader.ReadAsync())
             {
-                // 使用 using 语句来管理资源
-                using var cmd = new MySqlConnector.MySqlCommand(sqlCommand, connection);
-                using var reader = await cmd.ExecuteReaderAsync();
-                var results = new List<string>();
-
-                while (await reader.ReadAsync())
+                var record = new Dictionary<string, object?>();
+                foreach (var col in DatabaseDefinition)
                 {
-                    var record = new Dictionary<string, object?>();
-                    foreach (var col in DatabaseDefinition)
-                    {
-                        record[col.Name] = reader[col.Name] is DBNull ? null : reader[col.Name];
-                    }
-
-                    // 使用异步 JSON 序列化
-                    var jsonString = await IRepository.SerializeToJsonAsync(record);
-                    results.Add(jsonString);
+                    record[col.Name] = reader[col.Name] is DBNull ? null : reader[col.Name];
                 }
 
-                return results?.ToArray();
+                // 使用异步 JSON 序列化
+                var jsonString = await IRepository.SerializeToJsonAsync(record);
+                results.Add(jsonString);
             }
-            catch (MySqlConnector.MySqlException ex)
+
+            return results?.ToArray();
+        }
+        public virtual async Task<bool> AddNewRecordsAsync(Dictionary<string, object?>[] records)
+        {
+            using var connection = await TryConnectAsync() ?? throw new InvalidOperationException("Cannot establish database connection.");
+            if (records == null || records.Length == 0)
+                return false;
+            var sqlCommand = new StringBuilder();
+            foreach (var record in records)
             {
-                throw new InvalidOperationException($"Failed to read records. MySQL error {ex.Number}: {ex.Message}", ex);
+                sqlCommand.AppendLine($"INSERT INTO `{SheetName}` (");
+                var columnNames = DatabaseDefinition.Where(c => !c.AutoIncrement).Select(c => $"`{c.Name}`");
+                sqlCommand.AppendLine(string.Join(", ", columnNames));
+                sqlCommand.AppendLine(") VALUES (");
+                var values = new List<string>();
+                foreach (var col in DatabaseDefinition)
+                {
+                    if (col.AutoIncrement) continue; // 跳过自增列
+                    if (record.TryGetValue(col.Name, out var value) && value != null)
+                    {
+                        if (value is string strVal)
+                        {
+                            // 对字符串进行转义
+                            strVal = strVal.Replace("'", "''");
+                            values.Add($"'{strVal}'");
+                        }
+                        else if (value is bool boolVal)
+                        {
+                            values.Add(boolVal ? "1" : "0");
+                        }
+                        else if (value is DateTime dateTimeVal)
+                        {
+                            values.Add($"'{dateTimeVal:yyyy-MM-dd HH:mm:ss}'");
+                        }
+                        else
+                        {
+                            values.Add(value.ToString() ?? "NULL");
+                        }
+                    }
+                    else
+                    {
+                        values.Add("NULL");
+                    }
+                }
+                sqlCommand.AppendLine(string.Join(", ", values));
+                sqlCommand.AppendLine(");");
             }
+            using var cmd = new MySqlCommand(sqlCommand.ToString(), connection);
+            var affectedRows = await cmd.ExecuteNonQueryAsync();
+            return affectedRows == records.Length;
+        }
+        public virtual async Task<bool> DeleteRecordsAsync(string[] UUIDs)
+        {
+            using var connection = await TryConnectAsync() ?? throw new InvalidOperationException("Cannot establish database connection.");
+            if (UUIDs == null || UUIDs.Length == 0)
+                return false;
+            var sqlCommand = $"DELETE FROM `{SheetName}` WHERE `UUID` IN ({string.Join(",", UUIDs.Select(id => $"'{id}'"))});";
+            using var cmd = new MySqlCommand(sqlCommand, connection);
+            var affectedRows = await cmd.ExecuteNonQueryAsync();
+            return affectedRows == UUIDs.Length;
+        }
+        public virtual async Task<bool> UpdateRecordAsync(string UUID, Dictionary<string, object?> record)
+        {
+            using var connection = await TryConnectAsync() ?? throw new InvalidOperationException("Cannot establish database connection.");
+            if (string.IsNullOrWhiteSpace(UUID) || record == null || record.Count == 0)
+                throw new ArgumentException($"Unexpected paraments: {UUID}, {record}");
+            var command = new StringBuilder();
+            command.AppendLine($"UPDATE `{SheetName}` SET ");
+            var setClauses = new List<string>();
+            foreach (var col in DatabaseDefinition)
+            {
+                if (col.IsPrimaryKey) continue; // 跳过主键列
+                if (record.TryGetValue(col.Name, out var value))
+                {
+                    if (value is string strVal)
+                    {
+                        // 对字符串进行转义
+                        strVal = strVal.Replace("'", "''");
+                        setClauses.Add($"`{col.Name}` = '{strVal}'");
+                    }
+                    else if (value is bool boolVal)
+                    {
+                        setClauses.Add($"`{col.Name}` = {(boolVal ? "1" : "0")}");
+                    }
+                    else if (value is DateTime dateTimeVal)
+                    {
+                        setClauses.Add($"`{col.Name}` = '{dateTimeVal:yyyy-MM-dd HH:mm:ss}'");
+                    }
+                    else if (value != null)
+                    {
+                        setClauses.Add($"`{col.Name}` = {value}");
+                    }
+                    else
+                    {
+                        setClauses.Add($"`{col.Name}` = NULL");
+                    }
+                }
+            }
+            command.AppendLine(string.Join(", ", setClauses));
+            command.AppendLine($" WHERE `UUID` = '{UUID}';");
+            using var cmd = new MySqlCommand(command.ToString(), connection);
+            var affectedRows = await cmd.ExecuteNonQueryAsync();
+            return affectedRows == 1;
+        }
+        public virtual async Task<string[]?> SearchRecordsAsync(string searchTarget, object content)
+        {
+            var connection = await TryConnectAsync() ?? throw new InvalidOperationException("Cannot establish database connection.");
+            if (string.IsNullOrWhiteSpace(searchTarget) || content == null)
+                throw new ArgumentException($"Unexpected paraments: {searchTarget}, {content}");
+            var commandString = new StringBuilder();
+            commandString.AppendLine($"SELECT * FROM `{SheetName}` WHERE `{searchTarget}` = ");
+            if (content is string strVal)
+            {
+                // 对字符串进行转义
+                strVal = strVal.Replace("'", "''");
+                commandString.AppendLine($"'{strVal}';");
+            }
+            else if (content is bool boolVal)
+            {
+                commandString.AppendLine(boolVal ? "1;" : "0;");
+            }
+            else if (content is DateTime dateTimeVal)
+            {
+                commandString.AppendLine($"'{dateTimeVal:yyyy-MM-dd HH:mm:ss}';");
+            }
+            else
+            {
+                commandString.AppendLine($"{content};");
+            }
+            using var cmd = new MySqlCommand(commandString.ToString(), connection);
+            using var reader = await cmd.ExecuteReaderAsync();
+            var results = new List<string>();
+            while (reader.Read())
+            {
+                var record = new Dictionary<string, object?>();
+                foreach (var col in DatabaseDefinition)
+                {
+                    record[col.Name] = reader[col.Name] is DBNull ? null : reader[col.Name];
+                }
+                // 使用异步 JSON 序列化
+                var jsonString = await IRepository.SerializeToJsonAsync(record);
+                results.Add(jsonString);
+            }
+            return results?.ToArray();
         }
     }
-
-
 }

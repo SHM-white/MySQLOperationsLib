@@ -6,7 +6,7 @@ namespace RepositoriesCore
 {
     public partial interface IRepository
     {
-        List<ColumnDefinition> DatabaseDefinition { get; }
+        IEnumerable<ColumnDefinition> DatabaseDefinition { get; }
         string ConnectionString { get; set; }
         string SheetName { get; }
         // Sync versions
@@ -16,8 +16,8 @@ namespace RepositoriesCore
         Task<bool> InitializeDatabaseAsync(IEnumerable<ColumnDefinition> columns);
         // Async versions
         Task<MySqlConnection?> TryConnectAsync();
-        Task<bool> AddNewRecordsAsync(string[] records);
-        Task<bool> UpdateRecordAsync(string UUID, string record);
+        Task<bool> AddNewRecordsAsync(Dictionary<string, object?>[] records);
+        Task<bool> UpdateRecordAsync(string UUID, Dictionary<string, object?> records);
         Task<string[]?> ReadRecordsAsync(string[] UUIDs);
         Task<bool> DeleteRecordsAsync(string[] UUIDs);
         Task<string[]?> SearchRecordsAsync(string searchTarget, object content);

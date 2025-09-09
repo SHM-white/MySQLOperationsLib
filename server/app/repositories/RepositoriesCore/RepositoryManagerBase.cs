@@ -55,15 +55,38 @@ namespace RepositoriesCore
             {
                 return false;
             }
-            if (_connection is null)
+            
+            try
             {
-                _connection = new MySqlConnection(ConnectionString);
+                // 如果连接已存在但状态异常，先清理
+                if (_connection != null && _connection.State == System.Data.ConnectionState.Broken)
+                {
+                    _connection.Dispose();
+                    _connection = null;
+                }
+                
+                if (_connection is null)
+                {
+                    _connection = new MySqlConnection(ConnectionString);
+                }
+                
+                if (_connection.State != System.Data.ConnectionState.Open)
+                {
+                    await _connection.OpenAsync();
+                }
+                
+                return _connection.State == System.Data.ConnectionState.Open;
             }
-            if (_connection is not null && _connection.State != System.Data.ConnectionState.Open)
+            catch (MySqlException ex)
             {
-                await _connection.OpenAsync();
+                // 连接失败时清理资源
+                if (_connection != null)
+                {
+                    _connection.Dispose();
+                    _connection = null;
+                }
+                throw new InvalidOperationException($"Failed to connect to database. MySQL error {ex.Number}: {ex.Message}", ex);
             }
-            return _connection is not null && _connection.State == System.Data.ConnectionState.Open;
         }
         public virtual void Disconnect()
         {
@@ -131,10 +154,47 @@ namespace RepositoriesCore
             {
                 var type = c.ToMySqlType();
                 var nullStr = c.IsNullable && !c.IsPrimaryKey ? "NULL" : "NOT NULL";
-                var autoInc = c.AutoIncrement ? " AUTO_INCREMENT" : string.Empty;
-                var defaultExpr = !string.IsNullOrWhiteSpace(c.DefaultValue) ? $" DEFAULT {c.DefaultValue}" : string.Empty;
+                
+                // AUTO_INCREMENT 只能用于数值类型的主键
+                var autoInc = c.AutoIncrement && c.IsPrimaryKey && IsNumericType(c.Type) ? " AUTO_INCREMENT" : string.Empty;
+                
+                // 处理 DEFAULT 值
+                var defaultExpr = string.Empty;
+                if (!string.IsNullOrWhiteSpace(c.DefaultValue))
+                {
+                    if (c.Type == DbColumnType.DateTime)
+                    {
+                        // 处理 DateTime 类型的特殊默认值
+                        if (c.DefaultValue.Contains("ON UPDATE"))
+                        {
+                            // 分离默认值和更新值
+                            var parts = c.DefaultValue.Split(new[] { " ON UPDATE " }, StringSplitOptions.RemoveEmptyEntries);
+                            if (parts.Length == 2)
+                            {
+                                defaultExpr = $" DEFAULT {parts[0]} ON UPDATE {parts[1]}";
+                            }
+                            else
+                            {
+                                defaultExpr = $" DEFAULT {c.DefaultValue}";
+                            }
+                        }
+                        else
+                        {
+                            defaultExpr = $" DEFAULT {c.DefaultValue}";
+                        }
+                    }
+                    else
+                    {
+                        defaultExpr = $" DEFAULT {c.DefaultValue}";
+                    }
+                }
+                
                 var comment = !string.IsNullOrWhiteSpace(c.Comment) ? $" COMMENT '{c.Comment.Replace("'", "''")}'" : string.Empty;
-                columnSqlParts.Add($"`{c.Name}` {type} {nullStr}{autoInc}{defaultExpr}{comment}".Trim());
+                
+                // 构建完整的列定义：类型 + NOT NULL/NULL + AUTO_INCREMENT + DEFAULT + COMMENT
+                var columnDef = $"`{c.Name}` {type} {nullStr}{autoInc}{defaultExpr}{comment}".Trim();
+                columnSqlParts.Add(columnDef);
+                
                 if (c.IsUnique && !c.IsPrimaryKey)
                 {
                     uniqueKeys.Add($"UNIQUE KEY `UK_{_sheetName}_{c.Name}` (`{c.Name}`)");
@@ -162,9 +222,25 @@ namespace RepositoriesCore
             await cmd.ExecuteNonQueryAsync();
             return true;
         }
+
+        // 辅助方法：检查是否为数值类型
+        private static bool IsNumericType(DbColumnType type)
+        {
+            return type == DbColumnType.Int32 || type == DbColumnType.Int64 || type == DbColumnType.Decimal;
+        }
+
         public virtual bool IsConnected()
         {
-            return _connection is not null && _connection.State == System.Data.ConnectionState.Open;
+            try
+            {
+                return _connection is not null && 
+                       _connection.State == System.Data.ConnectionState.Open;
+            }
+            catch
+            {
+                // 如果检查连接状态时出现异常，认为连接不可用
+                return false;
+            }
         }
 
         public virtual async Task<bool> DatabaseIsInitializedAsync()
@@ -194,14 +270,29 @@ namespace RepositoriesCore
 
         public virtual async Task<string> ExecuteCommandAsync(string commandText)
         {
-            if (!IsConnected())
+            // 确保连接可用
+            if (!await EnsureConnectionAvailableAsync())
             {
-                throw new InvalidOperationException("Not connected to the database.");
+                throw new InvalidOperationException("Cannot establish or verify database connection.");
             }
-            using (var command = new MySqlCommand(commandText, _connection))
+            
+            try
             {
+                using var command = new MySqlCommand(commandText, _connection);
                 var result = await command.ExecuteScalarAsync();
                 return result?.ToString() ?? string.Empty;
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("already in use"))
+            {
+                // 如果连接仍然被占用，等待并重试一次
+                await Task.Delay(50);
+                using var command = new MySqlCommand(commandText, _connection);
+                var result = await command.ExecuteScalarAsync();
+                return result?.ToString() ?? string.Empty;
+            }
+            catch (MySqlException ex)
+            {
+                throw new InvalidOperationException($"Failed to execute command. MySQL error {ex.Number}: {ex.Message}", ex);
             }
         }
 
@@ -212,6 +303,34 @@ namespace RepositoriesCore
                 return await ConnectAsync();
             }
             return IsConnected();
+        }
+
+        // 辅助方法：确保连接可用并且没有被其他操作占用
+        protected virtual async Task<bool> EnsureConnectionAvailableAsync()
+        {
+            if (!IsConnected())
+            {
+                return await ConnectAsync();
+            }
+
+            // 检查连接是否被占用（通过尝试执行一个简单的查询）
+            try
+            {
+                using var testCmd = new MySqlCommand("SELECT 1", _connection);
+                await testCmd.ExecuteScalarAsync();
+                return true;
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("already in use"))
+            {
+                // 连接被占用，等待一小段时间后重试
+                await Task.Delay(10);
+                return false;
+            }
+            catch
+            {
+                // 其他错误，尝试重新连接
+                return await ConnectAsync();
+            }
         }
 
         // Abstract methods to be implemented by subclasses

@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using RepositoriesCore;
 
@@ -10,16 +11,17 @@ namespace UnitTest
     public sealed class Test1
     {
         [TestMethod]
-        public void Repository_Methods_Compile()
+        public async Task Repository_Methods_Compile()
         {
             var repo = new RepositoriesCore.EmployeesRepository("Server=localhost;Database=Dummy;User Id=user;Password=pwd;");
 
-            var initResult = repo.InitializeDatabase(repo.DatabaseDefinition);
-            var isInitialized = repo.DatabaseIsInitialized();
+            var initResult = await repo.InitializeDatabaseAsync(repo.DatabaseDefinition);
+            var isInitialized = await repo.DatabaseIsInitializedAsync();
             // 对于空实现 / 或尚未真正连接的情况，只验证方法调用流程
             Assert.IsTrue(initResult); // 动态建表返回 true
             // isInitialized 可能为 true (表已建) 或 false (若连接失败)，这里不硬性断言结构存在
         }
+        
         public static RepositoriesCore.EmployeesRepository CreateRepository(string connectionString)
         {
             var debugConfigFile = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "test.ini");
@@ -32,8 +34,8 @@ namespace UnitTest
                 ));
             return repo;
         }
-
     }
+    
     class IniFileHandler
     {
         [DllImport("kernel32")]
@@ -54,5 +56,4 @@ namespace UnitTest
             return temp.ToString();
         }
     }
-
 }

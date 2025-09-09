@@ -21,25 +21,102 @@ namespace TestUtils
                 
                 if (!await repo.DatabaseIsInitializedAsync())
                 {
+                    Console.WriteLine("Initializing database with fixed SQL generation...");
                     await repo.InitializeDatabaseAsync(repo.DatabaseDefinition);
-                    Console.WriteLine($"Repo1 initialized the database.");
+                    Console.WriteLine($"Repo1 initialized the database successfully.");
                 }
 
-                Console.WriteLine($"Type 'exit' to quit.");
+                // 测试 MySqlConnection 重用修复 - 并发操作测试
+                Console.WriteLine("\nTesting MySqlConnection reuse fix with concurrent operations...");
+                await TestConcurrentOperations(repo);
+
+                // 测试异步读取记录（使用异步 JSON 序列化）
+                Console.WriteLine("\nTesting async ReadRecordsAsync with JSON serialization...");
+                try
+                {
+                    var testUUIDs = new[] { "test-uuid-1", "test-uuid-2" };
+                    var records = await repo.ReadRecordsAsync(testUUIDs);
+                    Console.WriteLine($"Read {records?.Length ?? 0} records successfully using async JSON serialization.");
+                    if (records != null && records.Length > 0)
+                    {
+                        Console.WriteLine($"First record: {records[0]}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"ReadRecordsAsync test completed (expected if no data): {ex.Message}");
+                }
+
+                // 显示数据库定义以验证修复
+                Console.WriteLine("\nDatabase Definition:");
+                foreach (var col in repo.DatabaseDefinition)
+                {
+                    Console.WriteLine($"  {col.Name}: {col.Type} " +
+                        $"(PK: {col.IsPrimaryKey}, Auto: {col.AutoIncrement}, " +
+                        $"Default: {col.DefaultValue ?? "null"})");
+                }
+
+                Console.WriteLine($"\nType 'exit' to quit, or enter SQL commands to test:");
                 while (true)
                 {
-                    Console.Write("Repo1>");
+                    Console.Write("SQL>");
                     var input = Console.ReadLine();
                     if (string.IsNullOrEmpty(input)) continue;
                     if (input.Equals("exit", StringComparison.OrdinalIgnoreCase)) break;
-                    var output = await repo.ExecuteCommandAsync(input);
-                    Console.WriteLine($"{output}");
+                    if (input.Equals("test", StringComparison.OrdinalIgnoreCase))
+                    {
+                        await TestConcurrentOperations(repo);
+                        continue;
+                    }
+                    
+                    try
+                    {
+                        var output = await repo.ExecuteCommandAsync(input);
+                        Console.WriteLine($"Result: {output}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error: {ex.Message}");
+                    }
                 }
             }            
             catch (Exception ex)
             {
                 Console.WriteLine($"Error: {ex.Message}");
+                Console.WriteLine($"Stack Trace: {ex.StackTrace}");
             }
+        }
+
+        private static async Task TestConcurrentOperations(RepositoriesCore.EmployeesRepository repo)
+        {
+            Console.WriteLine("Starting concurrent operations test...");
+            var tasks = new List<Task>();
+            
+            // 创建多个并发任务
+            for (int i = 0; i < 5; i++)
+            {
+                int taskId = i;
+                tasks.Add(Task.Run(async () =>
+                {
+                    try
+                    {
+                        // 测试并发查询操作
+                        var result = await repo.ExecuteCommandAsync("SELECT 1");
+                        Console.WriteLine($"Task {taskId}: Query result = {result}");
+                        
+                        // 测试并发读取操作
+                        var records = await repo.ReadRecordsAsync(new[] { $"test-{taskId}" });
+                        Console.WriteLine($"Task {taskId}: Read {records?.Length ?? 0} records");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Task {taskId}: Error = {ex.Message}");
+                    }
+                }));
+            }
+            
+            await Task.WhenAll(tasks);
+            Console.WriteLine("Concurrent operations test completed!");
         }
 
         public static RepositoriesCore.EmployeesRepository CreateRepository()

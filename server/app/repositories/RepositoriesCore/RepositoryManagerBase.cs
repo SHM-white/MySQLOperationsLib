@@ -1,27 +1,22 @@
 ﻿using MySqlConnector;
 using System.Text;
+using System.Text.Json;
 
 namespace RepositoriesCore
 {
+    // Non-generic base class for backward compatibility
     public abstract partial class RepositoryManagerBase : IRepository, IDisposable
     {
-
         // Database structure definition
         public abstract IEnumerable<ColumnDefinition> DatabaseDefinition { get; }
 
         // Properties and fields
-        private string _connectionString;
-        protected string _sheetName;
-
+        private string _connectionString = connectionString ?? string.Empty;
+        protected string _sheetName = sheetName;
     }
-    public abstract partial class RepositoryManagerBase : IRepository, IDisposable
-    {
-        protected RepositoryManagerBase(string? connectionString, string sheetName)
-        {
-            _connectionString = connectionString ?? string.Empty;
-            _sheetName = sheetName;
-        }
 
+    public abstract partial class RepositoryManagerBase(string? connectionString, string sheetName) : IRepository, IDisposable
+    {
         public string ConnectionString
         {
             get => _connectionString;
@@ -80,9 +75,9 @@ namespace RepositoriesCore
 
         public virtual async Task<bool> InitializeDatabaseAsync(IEnumerable<ColumnDefinition> columns)
         {
-            if (columns is null) throw new ArgumentNullException(nameof(columns));
+            ArgumentNullException.ThrowIfNull(columns);
             var cols = columns.ToList();
-            if (!cols.Any()) throw new ArgumentException("No column definitions provided.");
+            if (cols.Count == 0) throw new ArgumentException("No column definitions provided.");
 
             using var connection = await TryConnectAsync() ?? throw new InvalidOperationException("Not connected to the database.");
             if (string.IsNullOrEmpty(SheetName))
@@ -136,7 +131,7 @@ namespace RepositoriesCore
                     if (c.Type == DbColumnType.DateTime && c.DefaultValue.Contains("ON UPDATE"))
                     {
                         // 分离默认值和更新值
-                        var parts = c.DefaultValue.Split(new[] { " ON UPDATE " }, StringSplitOptions.RemoveEmptyEntries);
+                        var parts = c.DefaultValue.Split([" ON UPDATE "], StringSplitOptions.RemoveEmptyEntries);
                         if (parts.Length == 2)
                         {
                             defaultExpr = $" DEFAULT {parts[0]} ON UPDATE {parts[1]}";
@@ -216,12 +211,12 @@ namespace RepositoriesCore
             var result = await command.ExecuteScalarAsync();
             return result?.ToString() ?? string.Empty;
         }
+
         public virtual async Task<string[]?> ReadRecordsAsync(string[] UUIDs)
         {
             using var connection = await TryConnectAsync() ?? throw new InvalidOperationException("Cannot establish database connection.");
             var sqlCommand = $"SELECT * FROM `{SheetName}` WHERE `UUID` IN ({string.Join(",", UUIDs.Select(id => $"'{id}'"))});";
 
-            // 使用 using 语句来管理资源
             using var cmd = new MySqlConnector.MySqlCommand(sqlCommand, connection);
             using var reader = await cmd.ExecuteReaderAsync();
             var results = new List<string>();
@@ -234,13 +229,13 @@ namespace RepositoriesCore
                     record[col.Name] = reader[col.Name] is DBNull ? null : reader[col.Name];
                 }
 
-                // 使用异步 JSON 序列化
                 var jsonString = await IRepository.SerializeToJsonAsync(record);
                 results.Add(jsonString);
             }
 
             return results?.ToArray();
         }
+
         public virtual async Task<bool> AddNewRecordsAsync(Dictionary<string, object?>[] records)
         {
             using var connection = await TryConnectAsync() ?? throw new InvalidOperationException("Cannot establish database connection.");
@@ -290,6 +285,7 @@ namespace RepositoriesCore
             var affectedRows = await cmd.ExecuteNonQueryAsync();
             return affectedRows == records.Length;
         }
+
         public virtual async Task<bool> DeleteRecordsAsync(string[] UUIDs)
         {
             using var connection = await TryConnectAsync() ?? throw new InvalidOperationException("Cannot establish database connection.");
@@ -300,6 +296,7 @@ namespace RepositoriesCore
             var affectedRows = await cmd.ExecuteNonQueryAsync();
             return affectedRows == UUIDs.Length;
         }
+
         public virtual async Task<bool> UpdateRecordAsync(string UUID, Dictionary<string, object?> record)
         {
             using var connection = await TryConnectAsync() ?? throw new InvalidOperationException("Cannot establish database connection.");
@@ -360,6 +357,7 @@ namespace RepositoriesCore
             var affectedRows = await cmd.ExecuteNonQueryAsync();
             return affectedRows == 1;
         }
+
         public virtual async Task<string[]?> SearchRecordsAsync(string searchTarget, object content)
         {
             using var connection = await TryConnectAsync() ?? throw new InvalidOperationException("Cannot establish database connection.");
@@ -405,5 +403,101 @@ namespace RepositoriesCore
             
             return results?.ToArray();
         }
+    }
+
+    public abstract partial class RepositoryManagerBase<T>(string? connectionString, string sheetName) : RepositoryManagerBase(connectionString, sheetName) where T : class
+    {
+        // Abstract methods for type conversion - must be implemented by derived classes
+        public abstract Dictionary<string, object?>? RecordToDict(T? record);
+        public abstract T? DictToRecord(Dictionary<string, object?>? dict);
+
+        // Strongly-typed methods that use the base class JSON methods
+
+        /// <summary>
+        /// Read records and return strongly-typed objects
+        /// </summary>
+        public virtual async Task<T[]?> ReadTypedRecordsAsync(string[] UUIDs)
+        {
+            var jsonResults = await ReadRecordsAsync(UUIDs);
+            if (jsonResults == null || jsonResults.Length == 0)
+                return null;
+                
+            var typedRecords = new List<T>();
+            foreach (var jsonItem in jsonResults)
+            {
+                try
+                {
+                    var dict = JsonSerializer.Deserialize<Dictionary<string, object?>>(jsonItem);
+                    if (dict != null)
+                    {
+                        var typedRecord = DictToRecord(dict);
+                        if (typedRecord != null)
+                        {
+                            typedRecords.Add(typedRecord);
+                        }
+                    }
+                }
+                catch (JsonException ex)
+                {
+                    throw new JsonException($"Failed to deserialize record: {jsonItem}", ex);
+                }
+            }
+            return [.. typedRecords];
+        }
+
+        /// <summary>
+        /// Add new records using strongly-typed objects
+        /// </summary>
+        public virtual async Task<bool> AddNewTypedRecordsAsync(T[] records)
+        {
+            var recordsDictionary = records.Select(
+                r => RecordToDict(r) ?? throw new ArgumentNullException(nameof(r), "Record cannot be null.")
+                ).ToArray() ?? [];
+            return await AddNewRecordsAsync(recordsDictionary);
+        }
+
+        /// <summary>
+        /// Update a record using strongly-typed object
+        /// </summary>
+        public virtual async Task<bool> UpdateTypedRecordAsync(string UUID, T record)
+        {
+            var recordDictionary = RecordToDict(record);
+            if (recordDictionary == null)
+                return false;
+            return await UpdateRecordAsync(UUID, recordDictionary);
+        }
+
+        /// <summary>
+        /// Search records and return strongly-typed objects
+        /// </summary>
+        public virtual async Task<T[]?> SearchTypedRecordsAsync(string searchTarget, object content)
+        {
+            var jsonResults = await SearchRecordsAsync(searchTarget, content);
+            if (jsonResults == null || jsonResults.Length == 0)
+                return null;
+                
+            var typedRecords = new List<T>();
+            foreach (var jsonItem in jsonResults)
+            {
+                try
+                {
+                    var dict = JsonSerializer.Deserialize<Dictionary<string, object?>>(jsonItem);
+                    if (dict != null)
+                    {
+                        var typedRecord = DictToRecord(dict);
+                        if (typedRecord != null)
+                        {
+                            typedRecords.Add(typedRecord);
+                        }
+                    }
+                }
+                catch (JsonException ex)
+                {
+                    throw new JsonException($"Failed to deserialize record: {jsonItem}", ex);
+                }
+            }
+            return [.. typedRecords];
+        }
+
     }
 }

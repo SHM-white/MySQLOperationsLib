@@ -50,16 +50,17 @@ namespace RepositoriesCore
         protected static async Task<string> SerializeToJsonAsync(Dictionary<string, object?> record)
         {
             using var stream = new MemoryStream();
-            await JsonSerializer.SerializeAsync(stream, record, new JsonSerializerOptions
-            {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                WriteIndented = false
-            });
+            await JsonSerializer.SerializeAsync(stream, record, CachedJsonSerializerOptions);
 
             stream.Position = 0;
             using var reader = new StreamReader(stream);
             return await reader.ReadToEndAsync();
         }
 
+        private static readonly JsonSerializerOptions CachedJsonSerializerOptions = new()
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = false
+        };
     }
 }

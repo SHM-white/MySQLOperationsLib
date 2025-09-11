@@ -79,6 +79,7 @@ namespace RepositoriesCore
         public record ActivityLogRecord(
             string UUID,
             string UserId,
+            string UserUUID,
             string ActivityType,    
             string DetailInformation,
             DateTime StartTime,
@@ -92,6 +93,7 @@ namespace RepositoriesCore
         [
             new (Name:"UUID", Type:DbColumnType.Guid, IsPrimaryKey:true, IsNullable:false, IsUnique:true, Comment:"记录uuid，主键"),
             new (Name:"UserId", Type:DbColumnType.String, Length:50, IsNullable:false, IsIndexed:true, Comment:"员工ID，外键关联employees表"),
+            new (Name:"UserUUID", Type:DbColumnType.Guid, IsNullable:false, IsIndexed:true, Comment:"员工UUID，外键关联employees表"),
             new (Name:"ActivityType", Type:DbColumnType.String, Length:20, IsNullable:false, IsIndexed:true, Comment:"活动类型"),
             new (Name:"DetailInformation", Type:DbColumnType.Json, DefaultValue:null, Comment:"活动详情信息(JSON格式)"),
             new (Name:"StartTime", Type:DbColumnType.DateTime, IsNullable:false, IsIndexed:true, Comment:"活动开始时间"),

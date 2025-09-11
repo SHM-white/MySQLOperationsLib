@@ -3,7 +3,7 @@ using static RepositoriesCore.ActivityLogsRepository;
 
 namespace RepositoriesCore
 {
-    public class ActivityLogsRepository(string? connectionString) : RepositoryManagerBase<ActivityLogsRepository.ActivityLogRecord>(connectionString, "activity_logs")
+    public class ActivityLogsRepository(string? connectionString) : RepositoryManagerBase<ActivityLogsRepository.ActivityLogRecord>(connectionString, "ActivityLogs")
     {
         public override IEnumerable<ColumnDefinition> databaseDefinition => DatabaseDefinition;
 
@@ -19,13 +19,13 @@ namespace RepositoriesCore
         }
 
         // Additional convenience methods specific to activity logs
-        
+
         /// <summary>
-        /// Search activity logs by employee ID
+        /// Search activity logs by user ID
         /// </summary>
-        public async Task<ActivityLogRecord[]?> GetActivityLogsByEmployeeIdAsync(int employeeId)
+        public async Task<ActivityLogRecord[]?> GetActivityLogsByUserIdAsync(string userId)
         {
-            return await SearchTypedRecordsAsync("user_id", employeeId);
+            return await SearchTypedRecordsAsync("UserId", userId);
         }
 
         /// <summary>
@@ -33,24 +33,24 @@ namespace RepositoriesCore
         /// </summary>
         public async Task<ActivityLogRecord[]?> GetActivityLogsByTypeAsync(string activityType)
         {
-            return await SearchTypedRecordsAsync("activity_type", activityType);
+            return await SearchTypedRecordsAsync("ActivityType", activityType);
         }
 
         /// <summary>
-        /// Get activity logs within a date range for a specific employee
+        /// Get activity logs within a date range for a specific user
         /// </summary>
-        public async Task<ActivityLogRecord[]?> GetActivityLogsInDateRangeAsync(int employeeId, DateTime startDate, DateTime endDate)
+        public async Task<ActivityLogRecord[]?> GetActivityLogsInDateRangeAsync(string userId, DateTime startDate, DateTime endDate)
         {
             using var connection = await TryConnectAsync() ?? throw new InvalidOperationException("Cannot establish database connection.");
             
             var sql = $@"SELECT * FROM `{SheetName}` 
-                        WHERE `user_id` = @employeeId 
-                        AND `start_time` >= @startDate 
-                        AND `end_time` <= @endDate 
-                        ORDER BY `start_time`";
+                        WHERE `UserId` = @userId 
+                        AND `StartTime` >= @startDate 
+                        AND `EndTime` <= @endDate 
+                        ORDER BY `StartTime`";
 
             using var cmd = new MySqlConnector.MySqlCommand(sql, connection);
-            cmd.Parameters.AddWithValue("@employeeId", employeeId);
+            cmd.Parameters.AddWithValue("@userId", userId);
             cmd.Parameters.AddWithValue("@startDate", startDate);
             cmd.Parameters.AddWithValue("@endDate", endDate);
             
@@ -75,7 +75,7 @@ namespace RepositoriesCore
             return [.. results];
         }
 
-        // Activity log record definition - LogId changed to string
+        // Activity log record definition
         public record ActivityLogRecord(
             string UUID,
             string UserId,
@@ -87,13 +87,13 @@ namespace RepositoriesCore
             DateTime CreatedAt
         );
         
-        // Database definition based on the provided table structure - log_id changed to string
+        // Database definition
         public static readonly IEnumerable<ColumnDefinition> DatabaseDefinition =
         [
             new (Name:"UUID", Type:DbColumnType.Guid, IsPrimaryKey:true, IsNullable:false, IsUnique:true, Comment:"记录uuid，主键"),
             new (Name:"UserId", Type:DbColumnType.String, Length:50, IsNullable:false, IsIndexed:true, Comment:"员工ID，外键关联employees表"),
             new (Name:"ActivityType", Type:DbColumnType.String, Length:20, IsNullable:false, IsIndexed:true, Comment:"活动类型"),
-            new (Name:"DetailInformation", Type:DbColumnType.Json, DefaultValue:"{}", Comment:"活动详情信息(JSON格式)"),
+            new (Name:"DetailInformation", Type:DbColumnType.Json, DefaultValue:null, Comment:"活动详情信息(JSON格式)"),
             new (Name:"StartTime", Type:DbColumnType.DateTime, IsNullable:false, IsIndexed:true, Comment:"活动开始时间"),
             new (Name:"EndTime", Type:DbColumnType.DateTime, IsNullable:false, Comment:"活动结束时间"),
             new (Name:"Duration", Type:DbColumnType.Int32, IsNullable:false, DefaultValue:"0", Comment:"活动持续时间(秒)"),

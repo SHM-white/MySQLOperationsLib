@@ -33,7 +33,7 @@ namespace RepositoriesCore
         internal static bool IsValidIdentifier(this string name)
         {
             if (string.IsNullOrWhiteSpace(name)) return false;
-            return Regex.IsMatch(name, "^[A-Za-z_][A-Za-z0-9_]*$");
+            return Regex.IsMatch(name, "^[A-Za-z_][A-Za-z0-9_]*$"); // Must start with letter or underscore, followed by letters, digits, or underscores
         }
 
         internal static string ToMySqlType(this ColumnDefinition col)

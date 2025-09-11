@@ -187,6 +187,7 @@ namespace TestUtils
                     Department: departments[random.Next(departments.Length)],
                     WorkstationId: random.Next(2) == 0 ? $"WS-PERF-{i:D3}" : null,
                     Preference: random.Next(2) == 0 ? $$$"""{"theme": "{{{(random.Next(2) == 0 ? "dark" : "light")}}}", "notifications": {{{(random.Next(2) == 0 ? "true" : "false")}}}""" : null,
+                    Online: false,
                     CreatedAt: now,
                     UpdatedAt: now
                 );

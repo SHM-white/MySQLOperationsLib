@@ -106,21 +106,21 @@ namespace TestUtils
                     Console.WriteLine($"  Search '{activityType}': {searchResults?.Length ?? 0} records in {stopwatch.ElapsedMilliseconds}ms");
                 }
 
-                // 测试按员工ID搜索
-                var employeeIds = new[] { 1001, 1002, 1003, 1004, 1005 };
-                foreach (var employeeId in employeeIds)
+                // 测试按用户ID搜索
+                var userIds = new[] { "USER001", "USER002", "USER003", "USER004", "USER005" };
+                foreach (var userId in userIds)
                 {
                     var stopwatch = Stopwatch.StartNew();
-                    var employeeResults = await repo.GetActivityLogsByEmployeeIdAsync(employeeId);
+                    var userResults = await repo.GetActivityLogsByUserIdAsync(userId);
                     stopwatch.Stop();
                     
-                    Console.WriteLine($"  Search Employee {employeeId}: {employeeResults?.Length ?? 0} records in {stopwatch.ElapsedMilliseconds}ms");
+                    Console.WriteLine($"  Search User {userId}: {userResults?.Length ?? 0} records in {stopwatch.ElapsedMilliseconds}ms");
                 }
 
                 // 测试日期范围搜索
                 var now = DateTime.Now;
                 var dateRangeStopwatch = Stopwatch.StartNew();
-                var dateRangeResults = await repo.GetActivityLogsInDateRangeAsync(1001, now.AddDays(-1), now);
+                var dateRangeResults = await repo.GetActivityLogsInDateRangeAsync("USER001", now.AddDays(-1), now);
                 dateRangeStopwatch.Stop();
                 
                 Console.WriteLine($"  Date range search: {dateRangeResults?.Length ?? 0} records in {dateRangeStopwatch.ElapsedMilliseconds}ms");
@@ -153,8 +153,8 @@ namespace TestUtils
                     
                     for (int i = 0; i < concurrency; i++)
                     {
-                        var employeeId = 1001 + (i % 5); // Rotate through employee IDs
-                        tasks.Add(repo.GetActivityLogsByEmployeeIdAsync(employeeId));
+                        var userId = $"USER{(i % 5) + 1:D3}"; // Rotate through USER001-USER005
+                        tasks.Add(repo.GetActivityLogsByUserIdAsync(userId));
                     }
                     
                     var results = await Task.WhenAll(tasks);
@@ -181,12 +181,13 @@ namespace TestUtils
                 var startTime = DateTime.Now.AddMinutes(-random.Next(0, 1440)); // Random time within last 24 hours
                 var duration = random.Next(60, 3600); // 1 minute to 1 hour
                 var endTime = startTime.AddSeconds(duration);
+                var activityType = activityTypes[random.Next(activityTypes.Length)];
                 
                 logs[i] = new ActivityLogsRepository.ActivityLogRecord(
                     UUID: Guid.NewGuid().ToString(),
-                    LogId: $"LOG{DateTime.Now.Ticks % 1000000:D6}{i:D4}", // Generate unique string LogId
-                    UserId: $"USER{random.Next(1, 999):D3}", // User IDs from USER001-USER100
-                    ActivityType: activityTypes[random.Next(activityTypes.Length)],
+                    UserId: $"USER{random.Next(1, 999):D3}",
+                    ActivityType: activityType,
+                    DetailInformation: $"{{\"duration\": {duration}, \"type\": \"{activityType}\", \"location\": \"office\"}}",
                     StartTime: startTime,
                     EndTime: endTime,
                     Duration: duration,
@@ -252,9 +253,9 @@ namespace TestUtils
                             await repo.GetActivityLogsByTypeAsync(activityType);
                             break;
 
-                        case 3: // Search by employee
-                            var employeeId = 1000 + random.Next(1, 100);
-                            await repo.GetActivityLogsByEmployeeIdAsync(employeeId);
+                        case 3: // Search by user
+                            var userId = $"USER{random.Next(1, 100):D3}";
+                            await repo.GetActivityLogsByUserIdAsync(userId);
                             break;
 
                         case 4: // Count

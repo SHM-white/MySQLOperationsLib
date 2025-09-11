@@ -5,7 +5,7 @@ using TestUtils;
 
 namespace Test
 {
-    internal class Program
+    public class TestProgram
     {
         static async Task Main(string[] args)
         {
@@ -64,7 +64,6 @@ namespace Test
                 Console.WriteLine($"Stack Trace: {ex.StackTrace}");
             }
         }
-
 
         private static async Task RunEmployeesRepositoryTests(EmployeesRepository repo)
         {
@@ -253,11 +252,11 @@ namespace Test
                 return;
             }
 
-            Console.WriteLine("\n4. Testing activity logs GetActivityLogsByEmployeeIdAsync method...");
+            Console.WriteLine("\n4. Testing activity logs GetActivityLogsByUserIdAsync method...");
             try
             {
-                var employeeResults = await repo.GetActivityLogsByEmployeeIdAsync(1001);
-                Console.WriteLine($"✓ GetActivityLogsByEmployeeIdAsync result: Found {employeeResults?.Length ?? 0} records for employee 1001");
+                var employeeResults = await repo.GetActivityLogsByUserIdAsync("USER001");
+                Console.WriteLine($"✓ GetActivityLogsByUserIdAsync result: Found {employeeResults?.Length ?? 0} records for user USER001");
                 if (employeeResults != null && employeeResults.Length > 0)
                 {
                     foreach (var log in employeeResults)
@@ -268,7 +267,7 @@ namespace Test
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"✗ GetActivityLogsByEmployeeIdAsync failed: {ex.Message}");
+                Console.WriteLine($"✗ GetActivityLogsByUserIdAsync failed: {ex.Message}");
             }
 
             Console.WriteLine("\n5. Testing activity logs GetActivityLogsByTypeAsync method...");
@@ -295,7 +294,7 @@ namespace Test
                 var now = DateTime.Now;
                 var startDate = now.AddHours(-1);
                 var endDate = now.AddHours(1);
-                var dateRangeResults = await repo.GetActivityLogsInDateRangeAsync(1001, startDate, endDate);
+                var dateRangeResults = await repo.GetActivityLogsInDateRangeAsync("USER001", startDate, endDate);
                 Console.WriteLine($"✓ GetActivityLogsInDateRangeAsync result: Found {dateRangeResults?.Length ?? 0} records in date range");
             }
             catch (Exception ex)
@@ -368,6 +367,7 @@ namespace Test
                     Department: "Engineering",
                     WorkstationId: "WS-001",
                     Preference: """{"theme": "dark", "notifications": true}""",
+                    Online: false,
                     CreatedAt: now,
                     UpdatedAt: now
                 ),
@@ -378,6 +378,7 @@ namespace Test
                     Department: "Engineering",
                     WorkstationId: "WS-002",
                     Preference: """{"theme": "light", "notifications": false}""",
+                    Online: false,
                     CreatedAt: now,
                     UpdatedAt: now
                 ),
@@ -388,6 +389,7 @@ namespace Test
                     Department: "HR",
                     WorkstationId: "WS-003",
                     Preference: null,
+                    Online: false,
                     CreatedAt: now,
                     UpdatedAt: now
                 ),
@@ -398,6 +400,7 @@ namespace Test
                     Department: "Marketing",
                     WorkstationId: null,
                     Preference: """{"theme": "auto", "notifications": true, "language": "en"}""",
+                    Online: false,
                     CreatedAt: now,
                     UpdatedAt: now
                 )
@@ -411,9 +414,9 @@ namespace Test
             {
                 new RepositoriesCore.ActivityLogsRepository.ActivityLogRecord(
                     UUID: Guid.NewGuid().ToString(),
-                    LogId: Guid.NewGuid().ToString("N")[..8], // Generate unique string LogId
                     UserId: "USER001",
                     ActivityType: "sit",
+                    DetailInformation: """{"position": "desk_chair", "location": "office"}""",
                     StartTime: now.AddMinutes(-30),
                     EndTime: now.AddMinutes(-15),
                     Duration: 900, // 15 minutes
@@ -421,9 +424,9 @@ namespace Test
                 ),
                 new RepositoriesCore.ActivityLogsRepository.ActivityLogRecord(
                     UUID: Guid.NewGuid().ToString(),
-                    LogId: Guid.NewGuid().ToString("N")[..8], // Generate unique string LogId
                     UserId: "USER002",
                     ActivityType: "stand",
+                    DetailInformation: """{"location": "standing_desk"}""",
                     StartTime: now.AddMinutes(-15),
                     EndTime: now.AddMinutes(-10),
                     Duration: 300, // 5 minutes
@@ -431,9 +434,9 @@ namespace Test
                 ),
                 new RepositoriesCore.ActivityLogsRepository.ActivityLogRecord(
                     UUID: Guid.NewGuid().ToString(),
-                    LogId: Guid.NewGuid().ToString("N")[..8], // Generate unique string LogId
                     UserId: "USER003",
                     ActivityType: "walk",
+                    DetailInformation: """{"route": "office_corridor", "distance": "50m"}""",
                     StartTime: now.AddMinutes(-45),
                     EndTime: now.AddMinutes(-40),
                     Duration: 300, // 5 minutes
@@ -441,9 +444,9 @@ namespace Test
                 ),
                 new RepositoriesCore.ActivityLogsRepository.ActivityLogRecord(
                     UUID: Guid.NewGuid().ToString(),
-                    LogId: Guid.NewGuid().ToString("N")[..8], // Generate unique string LogId
-                    UserId : "USER004",
+                    UserId: "USER004",
                     ActivityType: "meeting",
+                    DetailInformation: """{"type": "standing_meeting", "participants": 5}""",
                     StartTime: now.AddMinutes(-60),
                     EndTime: now.AddMinutes(-30),
                     Duration: 1800, // 30 minutes
@@ -504,6 +507,7 @@ namespace Test
             Console.WriteLine("  list-logs     - List activity logs");
             Console.WriteLine("  search-emp <dept> - Search employees by department");
             Console.WriteLine("  search-logs <type> - Search activity logs by type");
+            Console.WriteLine("  search-user <userId> - Search activity logs by user ID");
             Console.WriteLine("  count         - Get record counts");
             Console.WriteLine("  clear-emp     - Clear all employees");
             Console.WriteLine("  clear-logs    - Clear all activity logs");
@@ -584,11 +588,22 @@ namespace Test
                         case "search-logs":
                             if (parts.Length > 1)
                             {
-                                await SearchActivityLogs(activityLogsRepo, parts[1]);
+                                await SearchActivityLogsByType(activityLogsRepo, parts[1]);
                             }
                             else
                             {
                                 Console.WriteLine("Usage: search-logs <activity_type>");
+                            }
+                            break;
+
+                        case "search-user":
+                            if (parts.Length > 1)
+                            {
+                                await SearchActivityLogsByUser(activityLogsRepo, parts[1]);
+                            }
+                            else
+                            {
+                                Console.WriteLine("Usage: search-user <user_id>");
                             }
                             break;
 
@@ -622,7 +637,7 @@ namespace Test
                         case "help":
                             Console.WriteLine("Available commands:");
                             Console.WriteLine("  exit, test, perf, stress [n], conn, add-emp, add-log");
-                            Console.WriteLine("  list-emp, list-logs, search-emp <dept>, search-logs <type>");
+                            Console.WriteLine("  list-emp, list-logs, search-emp <dept>, search-logs <type>, search-user <userId>");
                             Console.WriteLine("  count, clear-emp, clear-logs, help, <SQL>");
                             break;
 
@@ -650,6 +665,7 @@ namespace Test
                 Department: "Test Department",
                 WorkstationId: $"WS-TEST-{now:HHmmss}",
                 Preference: """{"theme": "test", "notifications": true}""",
+                Online: false,
                 CreatedAt: now,
                 UpdatedAt: now
             );
@@ -663,9 +679,9 @@ namespace Test
             var now = DateTime.Now;
             var testLog = new RepositoriesCore.ActivityLogsRepository.ActivityLogRecord(
                 UUID: Guid.NewGuid().ToString(),
-                LogId: Guid.NewGuid().ToString("N")[..8], // Generate unique string LogId
-                UserId: $"USER{ new Random().Next(1, 999) :D3}",
+                UserId: $"USER{new Random().Next(1, 999):D3}",
                 ActivityType: "test_activity",
+                DetailInformation: """{"type": "test", "duration": 600}""",
                 StartTime: now.AddMinutes(-10),
                 EndTime: now,
                 Duration: 600, // 10 minutes
@@ -741,7 +757,7 @@ namespace Test
             }
         }
 
-        private static async Task SearchActivityLogs(ActivityLogsRepository repo, string activityType)
+        private static async Task SearchActivityLogsByType(ActivityLogsRepository repo, string activityType)
         {
             var results = await repo.GetActivityLogsByTypeAsync(activityType);
             if (results != null && results.Length > 0)
@@ -755,6 +771,23 @@ namespace Test
             else
             {
                 Console.WriteLine($"No '{activityType}' activity logs found.");
+            }
+        }
+
+        private static async Task SearchActivityLogsByUser(ActivityLogsRepository repo, string userId)
+        {
+            var results = await repo.GetActivityLogsByUserIdAsync(userId);
+            if (results != null && results.Length > 0)
+            {
+                Console.WriteLine($"Found {results.Length} activity logs for user {userId}:");
+                foreach (var log in results)
+                {
+                    Console.WriteLine($"  - {log.ActivityType}: {log.Duration}s at {log.StartTime:HH:mm:ss}");
+                }
+            }
+            else
+            {
+                Console.WriteLine($"No activity logs found for user {userId}.");
             }
         }
 
@@ -813,15 +846,9 @@ namespace Test
                 ));
             return repo;
         }
-
-        // 为了向后兼容，保留原有的CreateRepository方法
-        public static EmployeesRepository CreateRepository()
-        {
-            return CreateEmployeesRepository();
-        }
     }
     
-    class IniFileHandler
+    public class IniFileHandler
     {
         [DllImport("kernel32")]
         private static extern long WritePrivateProfileString(string section, string key, string val, string filePath);

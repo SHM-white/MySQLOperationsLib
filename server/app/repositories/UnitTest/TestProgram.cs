@@ -1,69 +1,70 @@
-Ôªøusing System.Collections.Generic;
-using System.Runtime.InteropServices;
-using System.Text;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.Data.SqlClient;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 using RepositoriesCore;
 using Test;
 
 namespace UnitTest
 {
     [TestClass]
-    public sealed class Test1
+    public sealed class TestProgram
     {
         [TestMethod]
         public async Task EmployeesRepository_Basic_Operations_Test()
         {
-            var repo = new RepositoriesCore.EmployeesRepository("Server=localhost;Database=TestDB;User Id=test;Password=test;");
+            var repo = Test.TestProgram.CreateEmployeesRepository();
 
+            // ÷ÿ–¬≥ı ºªØ ˝æ›ø‚
             var initResult = await repo.InitializeDatabaseAsync(repo.databaseDefinition);
             var isInitialized = await repo.DatabaseIsInitializedAsync();
             
-            // È™åËØÅÊï∞ÊçÆÂ∫ìÂàùÂßãÂåñ
+            // —È÷§ ˝æ›ø‚≥ı ºªØ
             Assert.IsTrue(initResult, "Database initialization should succeed");
-            // isInitialized ÂèØËÉΩ‰∏∫ true (Ë°®Â∑≤Âª∫) Êàñ false (Ëã•ËøûÊé•Â§±Ë¥•)ÔºåËøôÈáå‰∏çÁ°¨ÊÄßÊñ≠Ë®ÄÁªìÊûÑÂ≠òÂú®
         }
 
         [TestMethod]
         public async Task ActivityLogsRepository_Basic_Operations_Test()
         {
-            var repo = new RepositoriesCore.ActivityLogsRepository("Server=localhost;Database=TestDB;User Id=test;Password=test;");
+            var repo = Test.TestProgram.CreateActivityLogsRepository();
 
+            // ÷ÿ–¬≥ı ºªØ ˝æ›ø‚
             var initResult = await repo.InitializeDatabaseAsync(repo.databaseDefinition);
             var isInitialized = await repo.DatabaseIsInitializedAsync();
             
-            // È™åËØÅÊï∞ÊçÆÂ∫ìÂàùÂßãÂåñ
+            // —È÷§ ˝æ›ø‚≥ı ºªØ
             Assert.IsTrue(initResult, "Activity logs database initialization should succeed");
         }
 
         [TestMethod]
         public async Task EmployeesRepository_CRUD_Operations_Test()
         {
-            var repo = CreateTestEmployeesRepository();
+            var repo = Test.TestProgram.CreateEmployeesRepository();
             
             try
             {
-                // Á°Æ‰øùÊï∞ÊçÆÂ∫ìÂ∑≤ÂàùÂßãÂåñ
+                // ÷ÿ–¬≥ı ºªØ ˝æ›ø‚
                 await repo.InitializeDatabaseAsync(repo.databaseDefinition);
 
-                // 1. ÊµãËØïÊ∑ªÂä†ËÆ∞ÂΩï
+                // 1. ≤‚ ‘ÃÌº”º«¬º
                 var testEmployees = CreateTestEmployees();
                 var addResult = await repo.AddNewTypedRecordsAsync(testEmployees);
                 Assert.IsTrue(addResult, "Adding new employee records should succeed");
 
-                // 2. ÊµãËØïËØªÂèñËÆ∞ÂΩï
+                // 2. ≤‚ ‘∂¡»°º«¬º
                 var uuidsToRead = testEmployees.Select(e => e.UUID).ToArray();
                 var readRecords = await repo.ReadTypedRecordsAsync(uuidsToRead);
                 Assert.IsNotNull(readRecords, "Read employee records should not be null");
                 Assert.AreEqual(testEmployees.Length, readRecords.Length, "Should read the same number of records as added");
 
-                // 3. ÊµãËØïÊêúÁ¥¢ËÆ∞ÂΩï
+                // 3. ≤‚ ‘À—À˜º«¬º
                 var searchResults = await repo.SearchTypedRecordsAsync("department", "Engineering");
                 Assert.IsNotNull(searchResults, "Search results should not be null");
                 var engineeringCount = testEmployees.Count(e => e.Department == "Engineering");
                 Assert.AreEqual(engineeringCount, searchResults.Length, "Should find correct number of engineering employees");
 
-                // 4. ÊµãËØïÊõ¥Êñ∞ËÆ∞ÂΩï
+                // 4. ≤‚ ‘∏¸–¬º«¬º
                 if (readRecords.Length > 0)
                 {
                     var recordToUpdate = readRecords[0];
@@ -71,28 +72,28 @@ namespace UnitTest
                     var updateResult = await repo.UpdateTypedRecordAsync(recordToUpdate.UUID, updatedRecord);
                     Assert.IsTrue(updateResult, "Update should succeed");
 
-                    // È™åËØÅÊõ¥Êñ∞
+                    // —È÷§∏¸–¬
                     var verifyRecords = await repo.ReadTypedRecordsAsync(new[] { recordToUpdate.UUID });
                     Assert.IsNotNull(verifyRecords, "Verification read should not be null");
                     Assert.AreEqual(1, verifyRecords.Length, "Should find exactly one updated record");
                     Assert.AreEqual("Updated Engineering", verifyRecords[0].Department, "Department should be updated");
                 }
 
-                // 5. ÊµãËØïÂà†Èô§ËÆ∞ÂΩï
+                // 5. ≤‚ ‘…æ≥˝º«¬º
                 if (readRecords.Length > 0)
                 {
                     var recordToDelete = readRecords[^1];
                     var deleteResult = await repo.DeleteRecordsAsync(new[] { recordToDelete.UUID });
                     Assert.IsTrue(deleteResult, "Delete should succeed");
 
-                    // È™åËØÅÂà†Èô§
+                    // —È÷§…æ≥˝
                     var verifyAfterDelete = await repo.ReadTypedRecordsAsync(new[] { recordToDelete.UUID });
                     Assert.IsTrue(verifyAfterDelete == null || verifyAfterDelete.Length == 0, "Record should be deleted");
                 }
             }
             catch (Exception ex) when (ex.Message.Contains("connection") || ex.Message.Contains("database"))
             {
-                // Â¶ÇÊûúÊòØËøûÊé•ÊàñÊï∞ÊçÆÂ∫ìÈóÆÈ¢òÔºåË∑≥ËøáÊµãËØï
+                // »Áπ˚ «¡¨Ω”ªÚ ˝æ›ø‚Œ Ã‚£¨Ã¯π˝≤‚ ‘
                 Assert.Inconclusive($"Database connection issue: {ex.Message}");
             }
         }
@@ -100,42 +101,42 @@ namespace UnitTest
         [TestMethod]
         public async Task ActivityLogsRepository_CRUD_Operations_Test()
         {
-            var repo = CreateTestActivityLogsRepository();
+            var repo = Test.TestProgram.CreateActivityLogsRepository();
             
             try
             {
-                // Á°Æ‰øùÊï∞ÊçÆÂ∫ìÂ∑≤ÂàùÂßãÂåñ
+                // ÷ÿ–¬≥ı ºªØ ˝æ›ø‚
                 await repo.InitializeDatabaseAsync(repo.databaseDefinition);
 
-                // 1. ÊµãËØïÊ∑ªÂä†ËÆ∞ÂΩï
+                // 1. ≤‚ ‘ÃÌº”º«¬º
                 var testActivityLogs = CreateTestActivityLogs();
                 var addResult = await repo.AddNewTypedRecordsAsync(testActivityLogs);
                 Assert.IsTrue(addResult, "Adding new activity log records should succeed");
 
-                // 2. ÊµãËØïËØªÂèñËÆ∞ÂΩï
+                // 2. ≤‚ ‘∂¡»°º«¬º
                 var uuidsToRead = testActivityLogs.Select(e => e.UUID).ToArray();
                 var readRecords = await repo.ReadTypedRecordsAsync(uuidsToRead);
                 Assert.IsNotNull(readRecords, "Read activity log records should not be null");
                 Assert.AreEqual(testActivityLogs.Length, readRecords.Length, "Should read the same number of records as added");
 
-                // 3. ÊµãËØïÊêúÁ¥¢ËÆ∞ÂΩï
+                // 3. ≤‚ ‘À—À˜º«¬º
                 var searchResults = await repo.GetActivityLogsByTypeAsync("sit");
                 Assert.IsNotNull(searchResults, "Search results should not be null");
                 var sitCount = testActivityLogs.Count(e => e.ActivityType == "sit");
                 Assert.AreEqual(sitCount, searchResults.Length, "Should find correct number of sit activities");
 
-                // 4. ÊµãËØïÊåâÂëòÂ∑•IDÊêúÁ¥¢
-                var employeeResults = await repo.GetActivityLogsByEmployeeIdAsync(1001);
-                Assert.IsNotNull(employeeResults, "Employee search results should not be null");
-                var employee1001Count = testActivityLogs.Count(e => e.UserId == 1001);
-                Assert.AreEqual(employee1001Count, employeeResults.Length, "Should find correct number of activities for employee 1001");
+                // 4. ≤‚ ‘∞¥”√ªßIDÀ—À˜
+                var userResults = await repo.GetActivityLogsByUserIdAsync("USER001");
+                Assert.IsNotNull(userResults, "User search results should not be null");
+                var user001Count = testActivityLogs.Count(e => e.UserId == "USER001");
+                Assert.AreEqual(user001Count, userResults.Length, "Should find correct number of activities for USER001");
 
-                // 5. ÊµãËØïÊó•ÊúüËåÉÂõ¥ÊêúÁ¥¢
+                // 5. ≤‚ ‘»’∆⁄∑∂ŒßÀ—À˜
                 var now = DateTime.Now;
-                var dateRangeResults = await repo.GetActivityLogsInDateRangeAsync(1001, now.AddHours(-2), now.AddHours(2));
+                var dateRangeResults = await repo.GetActivityLogsInDateRangeAsync("USER001", now.AddHours(-2), now.AddHours(2));
                 Assert.IsNotNull(dateRangeResults, "Date range search results should not be null");
 
-                // 6. ÊµãËØïÊõ¥Êñ∞ËÆ∞ÂΩï
+                // 6. ≤‚ ‘∏¸–¬º«¬º
                 if (readRecords.Length > 0)
                 {
                     var recordToUpdate = readRecords[0];
@@ -143,7 +144,7 @@ namespace UnitTest
                     var updateResult = await repo.UpdateTypedRecordAsync(recordToUpdate.UUID, updatedRecord);
                     Assert.IsTrue(updateResult, "Update should succeed");
 
-                    // È™åËØÅÊõ¥Êñ∞
+                    // —È÷§∏¸–¬
                     var verifyRecords = await repo.ReadTypedRecordsAsync(new[] { recordToUpdate.UUID });
                     Assert.IsNotNull(verifyRecords, "Verification read should not be null");
                     Assert.AreEqual(1, verifyRecords.Length, "Should find exactly one updated record");
@@ -151,21 +152,21 @@ namespace UnitTest
                     Assert.AreEqual(1200, verifyRecords[0].Duration, "Duration should be updated");
                 }
 
-                // 7. ÊµãËØïÂà†Èô§ËÆ∞ÂΩï
+                // 7. ≤‚ ‘…æ≥˝º«¬º
                 if (readRecords.Length > 0)
                 {
                     var recordToDelete = readRecords[^1];
                     var deleteResult = await repo.DeleteRecordsAsync(new[] { recordToDelete.UUID });
                     Assert.IsTrue(deleteResult, "Delete should succeed");
 
-                    // È™åËØÅÂà†Èô§
+                    // —È÷§…æ≥˝
                     var verifyAfterDelete = await repo.ReadTypedRecordsAsync(new[] { recordToDelete.UUID });
                     Assert.IsTrue(verifyAfterDelete == null || verifyAfterDelete.Length == 0, "Record should be deleted");
                 }
             }
             catch (Exception ex) when (ex.Message.Contains("connection") || ex.Message.Contains("database"))
             {
-                // Â¶ÇÊûúÊòØËøûÊé•ÊàñÊï∞ÊçÆÂ∫ìÈóÆÈ¢òÔºåË∑≥ËøáÊµãËØï
+                // »Áπ˚ «¡¨Ω”ªÚ ˝æ›ø‚Œ Ã‚£¨Ã¯π˝≤‚ ‘
                 Assert.Inconclusive($"Database connection issue: {ex.Message}");
             }
         }
@@ -173,18 +174,22 @@ namespace UnitTest
         [TestMethod]
         public async Task Repository_Connection_Test()
         {
-            var employeesRepo = CreateTestEmployeesRepository();
-            var activityLogsRepo = CreateTestActivityLogsRepository();
+            var employeesRepo = Test.TestProgram.CreateEmployeesRepository();
+            var activityLogsRepo = Test.TestProgram.CreateActivityLogsRepository();
             
             try
             {
-                // ÊµãËØïÂëòÂ∑•‰ªìÂÇ®ËøûÊé•
+                // ÷ÿ–¬≥ı ºªØ ˝æ›ø‚
+                await employeesRepo.InitializeDatabaseAsync(employeesRepo.databaseDefinition);
+                await activityLogsRepo.InitializeDatabaseAsync(activityLogsRepo.databaseDefinition);
+
+                // ≤‚ ‘‘±π§≤÷¥¢¡¨Ω”
                 using var employeeConnection = await employeesRepo.TryConnectAsync();
                 if (employeeConnection != null)
                 {
                     Assert.AreEqual(System.Data.ConnectionState.Open, employeeConnection.State, "Employee connection should be open");
                     
-                    // ÊµãËØïÁÆÄÂçïÊü•ËØ¢
+                    // ≤‚ ‘ºÚµ•≤È—Ø
                     using var testCmd = new MySqlConnector.MySqlCommand("SELECT 1", employeeConnection);
                     var result = await testCmd.ExecuteScalarAsync();
                     Assert.AreEqual(1, Convert.ToInt32(result), "Test query should return 1");
@@ -194,16 +199,16 @@ namespace UnitTest
                     Assert.Inconclusive("Cannot establish employee database connection for testing");
                 }
 
-                // ÊµãËØïÊ¥ªÂä®Êó•Âøó‰ªìÂÇ®ËøûÊé•
+                // ≤‚ ‘ªÓ∂Ø»’÷æ≤÷¥¢¡¨Ω”
                 using var activityConnection = await activityLogsRepo.TryConnectAsync();
                 if (activityConnection != null)
                 {
                     Assert.AreEqual(System.Data.ConnectionState.Open, activityConnection.State, "Activity logs connection should be open");
                     
-                    // ÊµãËØïÁÆÄÂçïÊü•ËØ¢
-                    using var testCmd = new MySqlConnector.MySqlCommand("SELECT 1", activityConnection);
-                    var result = await testCmd.ExecuteScalarAsync();
-                    Assert.AreEqual(1, Convert.ToInt32(result), "Test query should return 1");
+                    // ≤‚ ‘ºÚµ•≤È—Ø
+                    using var testCmd2 = new MySqlConnector.MySqlCommand("SELECT 1", activityConnection);
+                    var result2 = await testCmd2.ExecuteScalarAsync();
+                    Assert.AreEqual(1, Convert.ToInt32(result2), "Test query should return 1");
                 }
                 else
                 {
@@ -219,15 +224,16 @@ namespace UnitTest
         [TestMethod]
         public async Task Repository_Concurrent_Operations_Test()
         {
-            var employeesRepo = CreateTestEmployeesRepository();
-            var activityLogsRepo = CreateTestActivityLogsRepository();
+            var employeesRepo = Test.TestProgram.CreateEmployeesRepository();
+            var activityLogsRepo = Test.TestProgram.CreateActivityLogsRepository();
             
             try
             {
+                // ÷ÿ–¬≥ı ºªØ ˝æ›ø‚
                 await employeesRepo.InitializeDatabaseAsync(employeesRepo.databaseDefinition);
                 await activityLogsRepo.InitializeDatabaseAsync(activityLogsRepo.databaseDefinition);
 
-                // Âπ∂ÂèëÊµãËØï
+                // ≤¢∑¢≤‚ ‘
                 var tasks = new List<Task<bool>>();
                 for (int i = 0; i < 5; i++)
                 {
@@ -236,15 +242,15 @@ namespace UnitTest
                     {
                         try
                         {
-                            // ÊµãËØïÂëòÂ∑•‰ªìÂÇ®Âπ∂ÂèëËøûÊé•
+                            // ≤‚ ‘‘±π§≤÷¥¢≤¢∑¢¡¨Ω”
                             using var empConnection = await employeesRepo.TryConnectAsync();
                             if (empConnection == null) return false;
 
-                            // ÊµãËØïÊ¥ªÂä®Êó•Âøó‰ªìÂÇ®Âπ∂ÂèëËøûÊé•
+                            // ≤‚ ‘ªÓ∂Ø»’÷æ≤÷¥¢≤¢∑¢¡¨Ω”
                             using var logConnection = await activityLogsRepo.TryConnectAsync();
                             if (logConnection == null) return false;
 
-                            // ÊµãËØïÂπ∂ÂèëÊü•ËØ¢
+                            // ≤‚ ‘≤¢∑¢≤È—Ø
                             var empResult = await employeesRepo.ExecuteCommandAsync("SELECT 1");
                             var logResult = await activityLogsRepo.ExecuteCommandAsync("SELECT 1");
                             
@@ -269,25 +275,26 @@ namespace UnitTest
         [TestMethod]
         public async Task Repository_Error_Handling_Test()
         {
-            var employeesRepo = CreateTestEmployeesRepository();
-            var activityLogsRepo = CreateTestActivityLogsRepository();
+            var employeesRepo = Test.TestProgram.CreateEmployeesRepository();
+            var activityLogsRepo = Test.TestProgram.CreateActivityLogsRepository();
             
             try
             {
+                // ÷ÿ–¬≥ı ºªØ ˝æ›ø‚
                 await employeesRepo.InitializeDatabaseAsync(employeesRepo.databaseDefinition);
                 await activityLogsRepo.InitializeDatabaseAsync(activityLogsRepo.databaseDefinition);
 
-                // ÊµãËØïËØªÂèñ‰∏çÂ≠òÂú®ÁöÑËÆ∞ÂΩï - ÂëòÂ∑•
+                // ≤‚ ‘∂¡»°≤ª¥Ê‘⁄µƒº«¬º - ‘±π§
                 var nonExistentEmployees = await employeesRepo.ReadTypedRecordsAsync(new[] { "non-existent-uuid" });
                 Assert.IsTrue(nonExistentEmployees == null || nonExistentEmployees.Length == 0, 
                     "Reading non-existent employee records should return empty result");
 
-                // ÊµãËØïËØªÂèñ‰∏çÂ≠òÂú®ÁöÑËÆ∞ÂΩï - Ê¥ªÂä®Êó•Âøó
+                // ≤‚ ‘∂¡»°≤ª¥Ê‘⁄µƒº«¬º - ªÓ∂Ø»’÷æ
                 var nonExistentLogs = await activityLogsRepo.ReadTypedRecordsAsync(new[] { "non-existent-uuid" });
                 Assert.IsTrue(nonExistentLogs == null || nonExistentLogs.Length == 0, 
                     "Reading non-existent activity log records should return empty result");
 
-                // ÊµãËØïÊó†ÊïàÁöÑÊêúÁ¥¢Êù°‰ª∂Â∫îËØ•ÊäõÂá∫ÂºÇÂ∏∏
+                // ≤‚ ‘Œﬁ–ßµƒÀ—À˜Ãıº˛”¶∏√≈◊≥ˆ“Ï≥£
                 await Assert.ThrowsExceptionAsync<Exception>(async () =>
                 {
                     await employeesRepo.SearchTypedRecordsAsync("non_existent_column", "test");
@@ -298,17 +305,17 @@ namespace UnitTest
                     await activityLogsRepo.SearchTypedRecordsAsync("non_existent_column", "test");
                 }, "Searching activity logs with invalid column should throw exception");
 
-                // ÊµãËØïÁ©∫ÂèÇÊï∞
+                // ≤‚ ‘ø’≤Œ ˝
                 await Assert.ThrowsExceptionAsync<ArgumentException>(async () =>
                 {
                     await employeesRepo.UpdateTypedRecordAsync("", new RepositoriesCore.EmployeesRepository.EmployeeRecord(
-                        "", "", "", "", null, null, DateTime.Now, DateTime.Now));
+                        "", "", "", "", null, null, false, DateTime.Now, DateTime.Now));
                 }, "Update employee with empty UUID should throw ArgumentException");
 
                 await Assert.ThrowsExceptionAsync<ArgumentException>(async () =>
                 {
                     await activityLogsRepo.UpdateTypedRecordAsync("", new RepositoriesCore.ActivityLogsRepository.ActivityLogRecord(
-                        "", "", 0, "", DateTime.Now, DateTime.Now, 0, DateTime.Now));
+                        "", "", "", "", DateTime.Now, DateTime.Now, 0, DateTime.Now));
                 }, "Update activity log with empty UUID should throw ArgumentException");
             }
             catch (Exception ex) when (ex.Message.Contains("connection") || ex.Message.Contains("database"))
@@ -320,14 +327,14 @@ namespace UnitTest
         [TestMethod]
         public void Repository_Data_Validation_Test()
         {
-            // ÊµãËØïËøûÊé•Â≠óÁ¨¶‰∏≤È™åËØÅ
+            // ≤‚ ‘¡¨Ω”◊÷∑˚¥Æ—È÷§
             Assert.IsTrue(IRepository.IsValidConnectionString("Server=localhost;Database=test;User Id=user;Password=pwd;"),
                 "Valid connection string should be recognized");
             
             Assert.IsFalse(IRepository.IsValidConnectionString("invalid connection string"),
                 "Invalid connection string should be rejected");
 
-            // ÊµãËØïËøûÊé•Â≠óÁ¨¶‰∏≤ÁîüÊàê
+            // ≤‚ ‘¡¨Ω”◊÷∑˚¥Æ…˙≥…
             var connectionString = IRepository.GenerateConnectionString("localhost", "testdb", "user", "password");
             Assert.IsTrue(IRepository.IsValidConnectionString(connectionString),
                 "Generated connection string should be valid");
@@ -344,25 +351,26 @@ namespace UnitTest
                 Department: "Test Dept",
                 WorkstationId: "WS-001",
                 Preference: """{"theme": "dark"}""",
+                Online: false,
                 CreatedAt: now,
                 UpdatedAt: now
             );
 
-            var repo = CreateTestEmployeesRepository();
+            var repo = Test.TestProgram.CreateEmployeesRepository();
             var dict = repo.RecordToDict(testRecord);
             Assert.IsNotNull(dict, "Record conversion should not return null");
             Assert.AreEqual("test-uuid", dict["UUID"], "UUID should be converted correctly");
             Assert.AreEqual("test-user", dict["user_id"], "UserId should be converted correctly");
             Assert.AreEqual("Test Name", dict["name"], "Name should be converted correctly");
 
-            // ÊµãËØïÂèçÂêëËΩ¨Êç¢
+            // ≤‚ ‘∑¥œÚ◊™ªª
             var convertedRecord = repo.DictToRecord(dict);
             Assert.IsNotNull(convertedRecord, "Dictionary to record conversion should not return null");
             Assert.AreEqual(testRecord.UUID, convertedRecord.UUID, "UUID should match after conversion");
             Assert.AreEqual(testRecord.UserId, convertedRecord.UserId, "UserId should match after conversion");
             Assert.AreEqual(testRecord.Name, convertedRecord.Name, "Name should match after conversion");
 
-            // ÊµãËØï null ËÆ∞ÂΩï
+            // ≤‚ ‘ null º«¬º
             var nullDict = repo.RecordToDict(null);
             Assert.IsNull(nullDict, "Null record should return null dictionary");
         }
@@ -373,86 +381,34 @@ namespace UnitTest
             var now = DateTime.Now;
             var testRecord = new RepositoriesCore.ActivityLogsRepository.ActivityLogRecord(
                 UUID: "test-uuid",
-                LogId: "TEST123",
-                EmployeeId: 1001,
+                UserId: "TEST123",
                 ActivityType: "sit",
+                DetailInformation: """{"type": "office_chair"}""",
                 StartTime: now.AddMinutes(-30),
                 EndTime: now,
                 Duration: 1800,
                 CreatedAt: now
             );
 
-            var repo = CreateTestActivityLogsRepository();
+            var repo = Test.TestProgram.CreateActivityLogsRepository();
             var dict = repo.RecordToDict(testRecord);
             Assert.IsNotNull(dict, "Activity log record conversion should not return null");
             Assert.AreEqual("test-uuid", dict["UUID"], "UUID should be converted correctly");
-            Assert.AreEqual("TEST123", dict["log_id"], "LogId should be converted correctly");
-            Assert.AreEqual(1001, dict["user_id"], "EmployeeId should be converted correctly");
+            Assert.AreEqual("TEST123", dict["user_id"], "UserId should be converted correctly");
             Assert.AreEqual("sit", dict["activity_type"], "ActivityType should be converted correctly");
             Assert.AreEqual(1800, dict["duration"], "Duration should be converted correctly");
 
-            // ÊµãËØïÂèçÂêëËΩ¨Êç¢
+            // ≤‚ ‘∑¥œÚ◊™ªª
             var convertedRecord = repo.DictToRecord(dict);
             Assert.IsNotNull(convertedRecord, "Dictionary to activity log record conversion should not return null");
             Assert.AreEqual(testRecord.UUID, convertedRecord.UUID, "UUID should match after conversion");
-            Assert.AreEqual(testRecord.LogId, convertedRecord.LogId, "LogId should match after conversion");
-            Assert.AreEqual(testRecord.UserId, convertedRecord.UserId, "EmployeeId should match after conversion");
+            Assert.AreEqual(testRecord.UserId, convertedRecord.UserId, "UserId should match after conversion");
             Assert.AreEqual(testRecord.ActivityType, convertedRecord.ActivityType, "ActivityType should match after conversion");
             Assert.AreEqual(testRecord.Duration, convertedRecord.Duration, "Duration should match after conversion");
 
-            // ÊµãËØï null ËÆ∞ÂΩï
+            // ≤‚ ‘ null º«¬º
             var nullDict = repo.RecordToDict(null);
             Assert.IsNull(nullDict, "Null activity log record should return null dictionary");
-        }
-
-        private static RepositoriesCore.EmployeesRepository CreateTestEmployeesRepository()
-        {
-            var debugConfigFile = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "test.ini");
-            var iniHandler = new IniFileHandler();
-            
-            try
-            {
-                var repo = new RepositoriesCore.EmployeesRepository(RepositoriesCore.IRepository.GenerateConnectionString(
-                    server: iniHandler.ReadValue("default", "Server", debugConfigFile),
-                    database: iniHandler.ReadValue("default", "Database", debugConfigFile),
-                    userId: iniHandler.ReadValue("default", "User_Id", debugConfigFile),
-                    password: iniHandler.ReadValue("default", "Password", debugConfigFile)
-                    ));
-                return repo;
-            }
-            catch
-            {
-                // Â¶ÇÊûúÊó†Ê≥ïËØªÂèñÈÖçÁΩÆÊñá‰ª∂Ôºå‰ΩøÁî®ÈªòËÆ§ÁöÑÊµãËØïËøûÊé•
-                return new RepositoriesCore.EmployeesRepository("Server=localhost;Database=TestDB;User Id=test;Password=test;");
-            }
-        }
-
-        private static RepositoriesCore.ActivityLogsRepository CreateTestActivityLogsRepository()
-        {
-            var debugConfigFile = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "test.ini");
-            var iniHandler = new IniFileHandler();
-            
-            try
-            {
-                var repo = new RepositoriesCore.ActivityLogsRepository(RepositoriesCore.IRepository.GenerateConnectionString(
-                    server: iniHandler.ReadValue("default", "Server", debugConfigFile),
-                    database: iniHandler.ReadValue("default", "Database", debugConfigFile),
-                    userId: iniHandler.ReadValue("default", "User_Id", debugConfigFile),
-                    password: iniHandler.ReadValue("default", "Password", debugConfigFile)
-                    ));
-                return repo;
-            }
-            catch
-            {
-                // Â¶ÇÊûúÊó†Ê≥ïËØªÂèñÈÖçÁΩÆÊñá‰ª∂Ôºå‰ΩøÁî®ÈªòËÆ§ÁöÑÊµãËØïËøûÊé•
-                return new RepositoriesCore.ActivityLogsRepository("Server=localhost;Database=TestDB;User Id=test;Password=test;");
-            }
-        }
-
-        // ‰∏∫‰∫ÜÂêëÂêéÂÖºÂÆπÔºå‰øùÁïôÂéüÊúâÁöÑCreateTestRepositoryÊñπÊ≥ï
-        private static RepositoriesCore.EmployeesRepository CreateTestRepository()
-        {
-            return CreateTestEmployeesRepository();
         }
 
         private static RepositoriesCore.EmployeesRepository.EmployeeRecord[] CreateTestEmployees()
@@ -467,6 +423,7 @@ namespace UnitTest
                     Department: "Engineering",
                     WorkstationId: "WS-TEST-001",
                     Preference: """{"theme": "dark", "notifications": true}""",
+                    Online: false,
                     CreatedAt: now,
                     UpdatedAt: now
                 ),
@@ -477,6 +434,7 @@ namespace UnitTest
                     Department: "HR",
                     WorkstationId: "WS-TEST-002",
                     Preference: null,
+                    Online: false,
                     CreatedAt: now,
                     UpdatedAt: now
                 ),
@@ -487,6 +445,7 @@ namespace UnitTest
                     Department: "Engineering",
                     WorkstationId: null,
                     Preference: """{"theme": "light"}""",
+                    Online: false,
                     CreatedAt: now,
                     UpdatedAt: now
                 )
@@ -500,9 +459,9 @@ namespace UnitTest
             {
                 new RepositoriesCore.ActivityLogsRepository.ActivityLogRecord(
                     UUID: Guid.NewGuid().ToString(),
-                    LogId: Guid.NewGuid().ToString("N")[..8], // Generate unique string LogId
-                    EmployeeId: 1001,
+                    UserId: "USER001",
                     ActivityType: "sit",
+                    DetailInformation: """{"position": "desk_chair", "location": "office"}""",
                     StartTime: now.AddMinutes(-30),
                     EndTime: now.AddMinutes(-15),
                     Duration: 900, // 15 minutes
@@ -510,9 +469,9 @@ namespace UnitTest
                 ),
                 new RepositoriesCore.ActivityLogsRepository.ActivityLogRecord(
                     UUID: Guid.NewGuid().ToString(),
-                    LogId: Guid.NewGuid().ToString("N")[..8], // Generate unique string LogId
-                    EmployeeId: 1001,
+                    UserId: "USER001",
                     ActivityType: "stand",
+                    DetailInformation: """{"location": "standing_desk"}""",
                     StartTime: now.AddMinutes(-15),
                     EndTime: now.AddMinutes(-10),
                     Duration: 300, // 5 minutes
@@ -520,9 +479,9 @@ namespace UnitTest
                 ),
                 new RepositoriesCore.ActivityLogsRepository.ActivityLogRecord(
                     UUID: Guid.NewGuid().ToString(),
-                    LogId: Guid.NewGuid().ToString("N")[..8], // Generate unique string LogId
-                    EmployeeId: 1002,
+                    UserId: "USER002",
                     ActivityType: "walk",
+                    DetailInformation: """{"route": "office_corridor", "distance": "50m"}""",
                     StartTime: now.AddMinutes(-45),
                     EndTime: now.AddMinutes(-40),
                     Duration: 300, // 5 minutes
@@ -530,36 +489,15 @@ namespace UnitTest
                 ),
                 new RepositoriesCore.ActivityLogsRepository.ActivityLogRecord(
                     UUID: Guid.NewGuid().ToString(),
-                    LogId: Guid.NewGuid().ToString("N")[..8], // Generate unique string LogId
-                    EmployeeId: 1002,
+                    UserId: "USER002",
                     ActivityType: "meeting",
+                    DetailInformation: """{"type": "standing_meeting", "participants": 5}""",
                     StartTime: now.AddMinutes(-60),
                     EndTime: now.AddMinutes(-30),
                     Duration: 1800, // 30 minutes
                     CreatedAt: now
                 )
             };
-        }
-    }
-    
-    class IniFileHandler
-    {
-        [DllImport("kernel32")]
-        private static extern long WritePrivateProfileString(string section, string key, string val, string filePath);
-
-        [DllImport("kernel32")]
-        private static extern int GetPrivateProfileString(string section, string key, string def, StringBuilder retVal, int size, string filePath);
-
-        public void WriteValue(string section, string key, string value, string filePath)
-        {
-            WritePrivateProfileString(section, key, value, filePath);
-        }
-
-        public string ReadValue(string section, string key, string filePath)
-        {
-            StringBuilder temp = new StringBuilder(255);
-            GetPrivateProfileString(section, key, "", temp, 255, filePath);
-            return temp.ToString();
         }
     }
 }

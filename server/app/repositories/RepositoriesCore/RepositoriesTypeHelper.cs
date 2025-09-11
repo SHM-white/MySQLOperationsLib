@@ -12,7 +12,7 @@ namespace RepositoriesCore
     /// <summary>
     /// Extension methods for EmployeeRecord conversion to maintain backward compatibility
     /// </summary>
-    public static class EmployeeRecordExtensions
+    public static class RecordExtensions
     {
         // Record -> Dictionary
         public static Dictionary<string, object?>? RecordToDict<T>(this T? record) where T : class
@@ -40,7 +40,7 @@ namespace RepositoriesCore
                 var param = parameters[i];
                 if (dict.TryGetValue(param.Name ?? "", out var value) && value != null)
                 {
-                    args[i] = Convert.ChangeType(value, param.ParameterType);
+                    args[i] = ConvertToType(value, param.ParameterType);
                 }
                 else
                 {
@@ -50,54 +50,77 @@ namespace RepositoriesCore
             return (T?)ctor.Invoke(args);
         }
 
+        private static object? ConvertToType(object value, Type targetType)
+        {
+            if (value == null) return null;
+            
+            // Handle nullable types
+            var underlyingType = Nullable.GetUnderlyingType(targetType);
+            if (underlyingType != null)
+            {
+                targetType = underlyingType;
+            }
+            
+            // If already correct type, return as-is
+            if (targetType.IsAssignableFrom(value.GetType()))
+            {
+                return value;
+            }
+            
+            var stringValue = value.ToString();
+            if (string.IsNullOrEmpty(stringValue))
+            {
+                return GetDefault(targetType);
+            }
+            
+            // Handle specific types
+            if (targetType == typeof(string))
+                return stringValue;
+            
+            if (targetType == typeof(int))
+                return int.TryParse(stringValue, out var i) ? i : GetDefault(targetType);
+            
+            if (targetType == typeof(long))
+                return long.TryParse(stringValue, out var l) ? l : GetDefault(targetType);
+            
+            if (targetType == typeof(bool))
+            {
+                // Handle both "true/false" and "1/0" formats
+                if (bool.TryParse(stringValue, out var b))
+                    return b;
+                if (stringValue == "1")
+                    return true;
+                if (stringValue == "0")
+                    return false;
+                return GetDefault(targetType);
+            }
+            
+            if (targetType == typeof(DateTime))
+                return DateTime.TryParse(stringValue, out var d) ? d : GetDefault(targetType);
+            
+            if (targetType == typeof(decimal))
+                return decimal.TryParse(stringValue, out var dec) ? dec : GetDefault(targetType);
+            
+            if (targetType == typeof(double))
+                return double.TryParse(stringValue, out var dbl) ? dbl : GetDefault(targetType);
+            
+            if (targetType == typeof(float))
+                return float.TryParse(stringValue, out var f) ? f : GetDefault(targetType);
+            
+            if (targetType.IsEnum)
+                return Enum.TryParse(targetType, stringValue, true, out var e) ? e : GetDefault(targetType);
+            
+            // Fallback to Convert.ChangeType
+            try
+            {
+                return Convert.ChangeType(value, targetType);
+            }
+            catch
+            {
+                return GetDefault(targetType);
+            }
+        }
+
         private static object? GetDefault(Type type) => type.IsValueType ? Activator.CreateInstance(type) : null;
-    }
-
-    internal static class RepositoriesTypeHelper
-    {
-        public static string? GetStringValue(this Dictionary<string, object?> dict, string key)
-        {
-            if (dict.TryGetValue(key, out var value) && value != null)
-            {
-                return value.ToString();
-            }
-            return null;
-        }
-
-        public static DateTime? GetDateTimeValue(this Dictionary<string, object?> dict, string key)
-        {
-            if (dict.TryGetValue(key, out var value) && value != null)
-            {
-                if (value is DateTime dateTime)
-                {
-                    return dateTime;
-                }
-                if (DateTime.TryParse(value.ToString(), out var parsedDateTime))
-                {
-                    return parsedDateTime;
-                }
-            }
-            return null;
-        }
-        public static int? GetIntValue(this Dictionary<string, object?> dict, string key)
-        {
-            if (dict.TryGetValue(key, out var value) && value != null)
-            {
-                if (value is int intValue)
-                {
-                    return intValue;
-                }
-                if (value is long longValue)
-                {
-                    return (int)longValue;
-                }
-                if (int.TryParse(value.ToString(), out var parsedInt))
-                {
-                    return parsedInt;
-                }
-            }
-            return null;
-        }
-        
     }
 }

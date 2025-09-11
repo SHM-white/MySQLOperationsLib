@@ -415,6 +415,7 @@ namespace Test
                 new RepositoriesCore.ActivityLogsRepository.ActivityLogRecord(
                     UUID: Guid.NewGuid().ToString(),
                     UserId: "USER001",
+                    UserUUID: Guid.NewGuid().ToString(),
                     ActivityType: "sit",
                     DetailInformation: """{"position": "desk_chair", "location": "office"}""",
                     StartTime: now.AddMinutes(-30),
@@ -425,6 +426,7 @@ namespace Test
                 new RepositoriesCore.ActivityLogsRepository.ActivityLogRecord(
                     UUID: Guid.NewGuid().ToString(),
                     UserId: "USER002",
+                    UserUUID: Guid.NewGuid().ToString(),
                     ActivityType: "stand",
                     DetailInformation: """{"location": "standing_desk"}""",
                     StartTime: now.AddMinutes(-15),
@@ -435,6 +437,7 @@ namespace Test
                 new RepositoriesCore.ActivityLogsRepository.ActivityLogRecord(
                     UUID: Guid.NewGuid().ToString(),
                     UserId: "USER003",
+                    UserUUID: Guid.NewGuid().ToString(),
                     ActivityType: "walk",
                     DetailInformation: """{"route": "office_corridor", "distance": "50m"}""",
                     StartTime: now.AddMinutes(-45),
@@ -445,6 +448,7 @@ namespace Test
                 new RepositoriesCore.ActivityLogsRepository.ActivityLogRecord(
                     UUID: Guid.NewGuid().ToString(),
                     UserId: "USER004",
+                    UserUUID: Guid.NewGuid().ToString(),
                     ActivityType: "meeting",
                     DetailInformation: """{"type": "standing_meeting", "participants": 5}""",
                     StartTime: now.AddMinutes(-60),
@@ -680,6 +684,7 @@ namespace Test
             var testLog = new RepositoriesCore.ActivityLogsRepository.ActivityLogRecord(
                 UUID: Guid.NewGuid().ToString(),
                 UserId: $"USER{new Random().Next(1, 999):D3}",
+                UserUUID: Guid.NewGuid().ToString(),
                 ActivityType: "test_activity",
                 DetailInformation: """{"type": "test", "duration": 600}""",
                 StartTime: now.AddMinutes(-10),

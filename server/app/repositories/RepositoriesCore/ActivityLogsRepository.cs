@@ -3,8 +3,12 @@ using static RepositoriesCore.ActivityLogsRepository;
 
 namespace RepositoriesCore
 {
-    public class ActivityLogsRepository(string? connectionString) : RepositoryManagerBase<ActivityLogsRepository.ActivityLogRecord>(connectionString, "ActivityLogs")
+    public class ActivityLogsRepository : RepositoryManagerBase<ActivityLogsRepository.ActivityLogRecord>
     {
+        public ActivityLogsRepository(string? connectionString) : base(connectionString, "ActivityLogs")
+        {
+        }
+
         public override IEnumerable<ColumnDefinition> databaseDefinition => DatabaseDefinition;
 
         // Implement the abstract methods for type conversion
@@ -41,7 +45,7 @@ namespace RepositoriesCore
         /// </summary>
         public async Task<ActivityLogRecord[]?> GetActivityLogsInDateRangeAsync(string userId, DateTime startDate, DateTime endDate)
         {
-            using var connection = await TryConnectAsync() ?? throw new InvalidOperationException("Cannot establish database connection.");
+            using var connection = await TryConnectAsync() ?? throw new InvalidOperationException("无法建立数据库连接。");
             
             var sql = $@"SELECT * FROM `{SheetName}` 
                         WHERE `UserId` = @userId 
@@ -72,7 +76,7 @@ namespace RepositoriesCore
                 }
             }
 
-            return [.. results];
+            return results.ToArray();
         }
 
         // Activity log record definition
@@ -89,17 +93,17 @@ namespace RepositoriesCore
         );
         
         // Database definition
-        public static readonly IEnumerable<ColumnDefinition> DatabaseDefinition =
-        [
-            new (Name:"UUID", Type:DbColumnType.Guid, IsPrimaryKey:true, IsNullable:false, IsUnique:true, Comment:"记录uuid，主键"),
-            new (Name:"UserId", Type:DbColumnType.String, Length:50, IsNullable:false, IsIndexed:true, Comment:"员工ID，外键关联employees表"),
-            new (Name:"UserUUID", Type:DbColumnType.Guid, IsNullable:false, IsIndexed:true, Comment:"员工UUID，外键关联employees表"),
-            new (Name:"ActivityType", Type:DbColumnType.String, Length:20, IsNullable:false, IsIndexed:true, Comment:"活动类型"),
-            new (Name:"DetailInformation", Type:DbColumnType.Json, DefaultValue:null, Comment:"活动详情信息(JSON格式)"),
-            new (Name:"StartTime", Type:DbColumnType.DateTime, IsNullable:false, IsIndexed:true, Comment:"活动开始时间"),
-            new (Name:"EndTime", Type:DbColumnType.DateTime, IsNullable:false, Comment:"活动结束时间"),
-            new (Name:"Duration", Type:DbColumnType.Int32, IsNullable:false, DefaultValue:"0", Comment:"活动持续时间(秒)"),
-            new (Name:"CreatedAt", Type:DbColumnType.DateTime, IsNullable:false, DefaultValue:"CURRENT_TIMESTAMP", IsIndexed:true, Comment:"创建时间")
-        ];
+        public static readonly IEnumerable<ColumnDefinition> DatabaseDefinition = new ColumnDefinition[]
+        {
+            new ColumnDefinition(Name:"UUID", Type:DbColumnType.Guid, IsPrimaryKey:true, IsNullable:false, IsUnique:true, Comment:"记录uuid，主键"),
+            new ColumnDefinition(Name:"UserId", Type:DbColumnType.String, Length:50, IsNullable:false, IsIndexed:true, Comment:"员工ID，外键关联employees表"),
+            new ColumnDefinition(Name:"UserUUID", Type:DbColumnType.Guid, IsNullable:false, IsIndexed:true, Comment:"员工UUID，外键关联employees表"),
+            new ColumnDefinition(Name:"ActivityType", Type:DbColumnType.String, Length:20, IsNullable:false, IsIndexed:true, Comment:"活动类型"),
+            new ColumnDefinition(Name:"DetailInformation", Type:DbColumnType.Json, DefaultValue:null, Comment:"活动详情信息(JSON格式)"),
+            new ColumnDefinition(Name:"StartTime", Type:DbColumnType.DateTime, IsNullable:false, IsIndexed:true, Comment:"活动开始时间"),
+            new ColumnDefinition(Name:"EndTime", Type:DbColumnType.DateTime, IsNullable:false, Comment:"活动结束时间"),
+            new ColumnDefinition(Name:"Duration", Type:DbColumnType.Int32, IsNullable:false, DefaultValue:"0", Comment:"活动持续时间(秒)"),
+            new ColumnDefinition(Name:"CreatedAt", Type:DbColumnType.DateTime, IsNullable:false, DefaultValue:"CURRENT_TIMESTAMP", IsIndexed:true, Comment:"创建时间")
+        };
     }
 }

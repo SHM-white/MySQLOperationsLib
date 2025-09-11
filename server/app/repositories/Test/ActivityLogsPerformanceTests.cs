@@ -186,6 +186,7 @@ namespace TestUtils
                 logs[i] = new ActivityLogsRepository.ActivityLogRecord(
                     UUID: Guid.NewGuid().ToString(),
                     UserId: $"USER{random.Next(1, 999):D3}",
+                    UserUUID: Guid.NewGuid().ToString(),
                     ActivityType: activityType,
                     DetailInformation: $"{{\"duration\": {duration}, \"type\": \"{activityType}\", \"location\": \"office\"}}",
                     StartTime: startTime,

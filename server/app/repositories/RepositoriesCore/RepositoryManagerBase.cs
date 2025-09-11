@@ -5,17 +5,23 @@ using System.Text.Json;
 namespace RepositoriesCore
 {
     // Non-generic base class for backward compatibility
-    public abstract partial class RepositoryManagerBase : IRepository, IDisposable
+    public abstract partial class RepositoryManagerBase : IRepository
     {
         // Database structure definition
         public abstract IEnumerable<ColumnDefinition> databaseDefinition { get; }
 
         // Properties and fields
-        private string _connectionString = connectionString ?? string.Empty;
-        protected string _sheetName = sheetName;
+        private string _connectionString;
+        protected string _sheetName;
+
+        protected RepositoryManagerBase(string? connectionString, string sheetName)
+        {
+            _connectionString = connectionString ?? string.Empty;
+            _sheetName = sheetName;
+        }
     }
 
-    public abstract partial class RepositoryManagerBase(string? connectionString, string sheetName) : IRepository, IDisposable
+    public abstract partial class RepositoryManagerBase : IRepository
     {
         public string ConnectionString
         {
@@ -66,11 +72,6 @@ namespace RepositoriesCore
                 // 其他异常，也返回 null
                 return null;
             }
-        }
-
-        public void Dispose()
-        {
-            GC.SuppressFinalize(this);
         }
 
         public virtual async Task<bool> InitializeDatabaseAsync(IEnumerable<ColumnDefinition> columns)
@@ -131,7 +132,7 @@ namespace RepositoriesCore
                     if (c.Type == DbColumnType.DateTime && c.DefaultValue.Contains("ON UPDATE"))
                     {
                         // 分离默认值和更新值
-                        var parts = c.DefaultValue.Split([" ON UPDATE "], StringSplitOptions.RemoveEmptyEntries);
+                        var parts = c.DefaultValue.Split(new string[] { " ON UPDATE " }, StringSplitOptions.RemoveEmptyEntries);
                         if (parts.Length == 2)
                         {
                             defaultExpr = $" DEFAULT {parts[0]} ON UPDATE {parts[1]}";
@@ -405,8 +406,12 @@ namespace RepositoriesCore
         }
     }
 
-    public abstract partial class RepositoryManagerBase<T>(string? connectionString, string sheetName) : RepositoryManagerBase(connectionString, sheetName) where T : class
+    public abstract partial class RepositoryManagerBase<T> : RepositoryManagerBase where T : class
     {
+        protected RepositoryManagerBase(string? connectionString, string sheetName) : base(connectionString, sheetName)
+        {
+        }
+
         // Abstract methods for type conversion - must be implemented by derived classes
         public abstract Dictionary<string, object?>? RecordToDict(T? record);
         public abstract T? DictToRecord(Dictionary<string, object?>? dict);
@@ -442,7 +447,7 @@ namespace RepositoriesCore
                     throw new JsonException($"Failed to deserialize record: {jsonItem}", ex);
                 }
             }
-            return [.. typedRecords];
+            return typedRecords.ToArray();
         }
 
         /// <summary>
@@ -452,7 +457,7 @@ namespace RepositoriesCore
         {
             var recordsDictionary = records.Select(
                 r => RecordToDict(r) ?? throw new ArgumentNullException(nameof(r), "Record cannot be null.")
-                ).ToArray() ?? [];
+                ).ToArray();
             return await AddNewRecordsAsync(recordsDictionary);
         }
 
@@ -496,7 +501,7 @@ namespace RepositoriesCore
                     throw new JsonException($"Failed to deserialize record: {jsonItem}", ex);
                 }
             }
-            return [.. typedRecords];
+            return typedRecords.ToArray();
         }
 
     }

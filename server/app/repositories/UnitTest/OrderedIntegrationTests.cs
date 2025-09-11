@@ -126,8 +126,6 @@ namespace UnitTest
             finally
             {
                 _testDataSemaphore.Release();
-                _employeesRepo?.Dispose();
-                _activityLogsRepo?.Dispose();
                 _testDataSemaphore?.Dispose();
             }
         }
@@ -452,6 +450,7 @@ namespace UnitTest
             var testLogRecord = new RepositoriesCore.ActivityLogsRepository.ActivityLogRecord(
                 UUID: "test-log-uuid",
                 UserId: "TEST123",
+                UserUUID: "test-log-user-uuid",
                 ActivityType: "sit",
                 DetailInformation: """{"type": "office_chair"}""",
                 StartTime: now.AddMinutes(-30),
@@ -578,6 +577,7 @@ namespace UnitTest
                 new RepositoriesCore.ActivityLogsRepository.ActivityLogRecord(
                     UUID: "33333333-3333-3333-3333-333333333333", // 固定UUID
                     UserId: "INTEGRATION_TEST_001",
+                    UserUUID: "11111111-1111-1111-1111-111111111111",
                     ActivityType: "sit",
                     DetailInformation: """{"position": "integration_test_chair"}""",
                     StartTime: fixedTime.AddMinutes(-30),
@@ -588,6 +588,7 @@ namespace UnitTest
                 new RepositoriesCore.ActivityLogsRepository.ActivityLogRecord(
                     UUID: "44444444-4444-4444-4444-444444444444", // 固定UUID
                     UserId: "INTEGRATION_TEST_002",
+                    UserUUID: "22222222-2222-2222-2222-222222222222",
                     ActivityType: "walk",
                     DetailInformation: """{"route": "integration_test_corridor"}""",
                     StartTime: fixedTime.AddMinutes(-45),

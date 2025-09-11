@@ -11,7 +11,7 @@ namespace TestUtils
         public static async Task RunPerformanceTests(ActivityLogsRepository repo)
         {
             Console.WriteLine("\n" + "=".PadRight(60, '='));
-            Console.WriteLine("ACTIVITY LOGS PERFORMANCE TESTS");
+            Console.WriteLine("活动记录数据库性能测试");
             Console.WriteLine("=".PadRight(60, '='));
 
             await TestBatchInsertPerformance(repo);
@@ -20,7 +20,7 @@ namespace TestUtils
             await TestConcurrentOperations(repo);
             
             Console.WriteLine("=".PadRight(60, '='));
-            Console.WriteLine("ACTIVITY LOGS PERFORMANCE TESTS COMPLETED");
+            Console.WriteLine("活动记录数据库性能测试完成");
             Console.WriteLine("=".PadRight(60, '='));
         }
 

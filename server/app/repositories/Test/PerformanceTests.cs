@@ -11,7 +11,7 @@ namespace TestUtils
         public static async Task RunPerformanceTests(EmployeesRepository repo)
         {
             Console.WriteLine("\n" + "=".PadRight(60, '='));
-            Console.WriteLine("EMPLOYEES PERFORMANCE TESTS");
+            Console.WriteLine("员工数据库性能测试");
             Console.WriteLine("=".PadRight(60, '='));
 
             await TestBatchInsertPerformance(repo);
@@ -20,7 +20,7 @@ namespace TestUtils
             await TestLargeDatasetOperations(repo);
             
             Console.WriteLine("=".PadRight(60, '='));
-            Console.WriteLine("EMPLOYEES PERFORMANCE TESTS COMPLETED");
+            Console.WriteLine("员工数据库性能测试完成");
             Console.WriteLine("=".PadRight(60, '='));
         }
 

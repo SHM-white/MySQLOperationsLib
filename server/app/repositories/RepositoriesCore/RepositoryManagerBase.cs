@@ -421,7 +421,7 @@ namespace RepositoriesCore
             var jsonResults = await ReadRecordsAsync(UUIDs);
             if (jsonResults == null || jsonResults.Length == 0)
                 return null;
-                
+
             var typedRecords = new List<T>();
             foreach (var jsonItem in jsonResults)
             {
@@ -475,7 +475,7 @@ namespace RepositoriesCore
             var jsonResults = await SearchRecordsAsync(searchTarget, content);
             if (jsonResults == null || jsonResults.Length == 0)
                 return null;
-                
+
             var typedRecords = new List<T>();
             foreach (var jsonItem in jsonResults)
             {

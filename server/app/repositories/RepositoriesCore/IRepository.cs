@@ -5,10 +5,9 @@ namespace RepositoriesCore
 {
     public partial interface IRepository
     {
-        IEnumerable<ColumnDefinition> DatabaseDefinition { get; } // 数据库表定义
+        IEnumerable<ColumnDefinition> databaseDefinition { get; } // 数据库表定义
         string ConnectionString { get; set; } // 数据库连接字符串
         string SheetName { get; } // 数据库表名称
-        void Dispose(); // 释放资源
         Task<bool> DatabaseIsInitializedAsync(); // 检查数据库表是否已初始化
         Task<bool> InitializeDatabaseAsync(IEnumerable<ColumnDefinition> columns); // 初始化数据库表
         Task<MySqlConnection?> TryConnectAsync(); // 尝试连接数据库，返回 MySqlConnection 或 null
@@ -50,16 +49,17 @@ namespace RepositoriesCore
         protected static async Task<string> SerializeToJsonAsync(Dictionary<string, object?> record)
         {
             using var stream = new MemoryStream();
-            await JsonSerializer.SerializeAsync(stream, record, new JsonSerializerOptions
-            {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                WriteIndented = false
-            });
+            await JsonSerializer.SerializeAsync(stream, record, CachedJsonSerializerOptions);
 
             stream.Position = 0;
             using var reader = new StreamReader(stream);
             return await reader.ReadToEndAsync();
         }
 
+        private static readonly JsonSerializerOptions CachedJsonSerializerOptions = new()
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = false
+        };
     }
 }

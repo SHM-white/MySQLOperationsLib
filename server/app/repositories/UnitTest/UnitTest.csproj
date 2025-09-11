@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\RepositoriesCore\RepositoriesCore.csproj" />
+    <ProjectReference Include="..\Test\Test.csproj" />
     <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
   </ItemGroup>
 

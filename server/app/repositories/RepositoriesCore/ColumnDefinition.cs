@@ -16,16 +16,16 @@ namespace RepositoriesCore
     }
 
     public record ColumnDefinition(
-        string Name,
-        DbColumnType Type,
-        int? Length = null,
-        bool IsPrimaryKey = false,
-        bool IsNullable = true,
-        bool AutoIncrement = false,
-        string? DefaultValue = null,
-        bool IsUnique = false,
-        bool IsIndexed = false,
-        string? Comment = null
+        string Name,                    // Column name
+        DbColumnType Type,              // Data type
+        int? Length = null,             // Length for string types
+        bool IsPrimaryKey = false,      // Is primary key
+        bool IsNullable = true,         // Is nullable
+        bool AutoIncrement = false,     // Is auto-increment
+        string? DefaultValue = null,    // Default value
+        bool IsUnique = false,          // Is unique
+        bool IsIndexed = false,         // Is indexed
+        string? Comment = null          // Comment or description
     );
 
     internal static class ColumnDefinitionExtensions
@@ -33,7 +33,7 @@ namespace RepositoriesCore
         internal static bool IsValidIdentifier(this string name)
         {
             if (string.IsNullOrWhiteSpace(name)) return false;
-            return Regex.IsMatch(name, "^[A-Za-z_][A-Za-z0-9_]*$");
+            return Regex.IsMatch(name, "^[A-Za-z_][A-Za-z0-9_]*$"); // Must start with letter or underscore, followed by letters, digits, or underscores
         }
 
         internal static string ToMySqlType(this ColumnDefinition col)

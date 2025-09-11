@@ -11,7 +11,7 @@ namespace TestUtils
         public static async Task RunPerformanceTests(EmployeesRepository repo)
         {
             Console.WriteLine("\n" + "=".PadRight(60, '='));
-            Console.WriteLine("PERFORMANCE TESTS");
+            Console.WriteLine("员工数据库性能测试");
             Console.WriteLine("=".PadRight(60, '='));
 
             await TestBatchInsertPerformance(repo);
@@ -20,7 +20,7 @@ namespace TestUtils
             await TestLargeDatasetOperations(repo);
             
             Console.WriteLine("=".PadRight(60, '='));
-            Console.WriteLine("PERFORMANCE TESTS COMPLETED");
+            Console.WriteLine("员工数据库性能测试完成");
             Console.WriteLine("=".PadRight(60, '='));
         }
 
@@ -37,7 +37,7 @@ namespace TestUtils
                 
                 try
                 {
-                    var result = await repo.AddNewRecordsAsync(employees);
+                    var result = await repo.AddNewTypedRecordsAsync(employees);
                     stopwatch.Stop();
                     
                     Console.WriteLine($"  Inserted {size} records in {stopwatch.ElapsedMilliseconds}ms " +
@@ -76,7 +76,7 @@ namespace TestUtils
                     var uuidsToRead = allUUIDs.Take(size).ToArray();
                     var stopwatch = Stopwatch.StartNew();
                     
-                    var records = await repo.ReadRecordsAsync(uuidsToRead);
+                    var records = await repo.ReadTypedRecordsAsync(uuidsToRead);
                     stopwatch.Stop();
                     
                     Console.WriteLine($"  Read {records?.Length ?? 0} records in {stopwatch.ElapsedMilliseconds}ms " +
@@ -114,7 +114,7 @@ namespace TestUtils
                         var uuidsSubset = allUUIDs.Skip(i).Take(Math.Max(1, allUUIDs.Length / concurrency)).ToArray();
                         if (uuidsSubset.Length > 0)
                         {
-                            tasks.Add(repo.ReadRecordsAsync(uuidsSubset));
+                            tasks.Add(repo.ReadTypedRecordsAsync(uuidsSubset));
                         }
                     }
                     
@@ -144,7 +144,7 @@ namespace TestUtils
                 foreach (var dept in departments)
                 {
                     var stopwatch = Stopwatch.StartNew();
-                    var searchResults = await repo.SearchRecordsAsync("department", dept);
+                    var searchResults = await repo.SearchTypedRecordsAsync("department", dept);
                     stopwatch.Stop();
                     
                     Console.WriteLine($"  Search '{dept}': {searchResults?.Length ?? 0} records in {stopwatch.ElapsedMilliseconds}ms");
@@ -180,13 +180,17 @@ namespace TestUtils
             for (int i = 0; i < count; i++)
             {
                 var now = DateTime.Now.AddMinutes(-random.Next(0, 10000)); // 随机时间
+                var theme = random.Next(2) == 0 ? "dark" : "light";
+                var notifications = random.Next(2) == 0 ? "true" : "false";
+                
                 employees[i] = new EmployeesRepository.EmployeeRecord(
                     UUID: Guid.NewGuid().ToString(),
                     UserId: $"PERF{i:D6}",
                     Name: $"Performance Test Employee {i}",
                     Department: departments[random.Next(departments.Length)],
                     WorkstationId: random.Next(2) == 0 ? $"WS-PERF-{i:D3}" : null,
-                    Preference: random.Next(2) == 0 ? $$$"""{"theme": "{{{(random.Next(2) == 0 ? "dark" : "light")}}}", "notifications": {{{(random.Next(2) == 0 ? "true" : "false")}}}""" : null,
+                    Preference: random.Next(2) == 0 ? $"{{\"theme\": \"{theme}\", \"notifications\": {notifications}}}" : null,
+                    Online: false,
                     CreatedAt: now,
                     UpdatedAt: now
                 );
@@ -205,7 +209,26 @@ namespace TestUtils
             var uuids = new List<string>();
             while (await reader.ReadAsync())
             {
-                uuids.Add(reader.GetString("UUID"));
+                var uuidValue = reader["UUID"];
+                string uuidString;
+                
+                if (uuidValue is Guid guidValue)
+                {
+                    uuidString = guidValue.ToString();
+                }
+                else if (uuidValue is string stringValue)
+                {
+                    uuidString = stringValue;
+                }
+                else
+                {
+                    uuidString = uuidValue.ToString() ?? string.Empty;
+                }
+                
+                if (!string.IsNullOrEmpty(uuidString))
+                {
+                    uuids.Add(uuidString);
+                }
             }
             return uuids.ToArray();
         }
@@ -213,7 +236,7 @@ namespace TestUtils
         public static async Task RunStressTest(EmployeesRepository repo, int iterations = 100)
         {
             Console.WriteLine($"\n" + "=".PadRight(60, '='));
-            Console.WriteLine($"STRESS TEST ({iterations} iterations)");
+            Console.WriteLine($"EMPLOYEES STRESS TEST ({iterations} iterations)");
             Console.WriteLine("=".PadRight(60, '='));
 
             var overallStopwatch = Stopwatch.StartNew();
@@ -232,7 +255,7 @@ namespace TestUtils
                     {
                         case 0: // Add
                             var employees = GenerateTestEmployees(random.Next(1, 5));
-                            await repo.AddNewRecordsAsync(employees);
+                            await repo.AddNewTypedRecordsAsync(employees);
                             break;
 
                         case 1: // Read
@@ -240,14 +263,14 @@ namespace TestUtils
                             if (allUUIDs.Length > 0)
                             {
                                 var uuidsToRead = allUUIDs.Take(random.Next(1, Math.Min(10, allUUIDs.Length))).ToArray();
-                                await repo.ReadRecordsAsync(uuidsToRead);
+                                await repo.ReadTypedRecordsAsync(uuidsToRead);
                             }
                             break;
 
                         case 2: // Search
                             var departments = new[] { "Engineering", "HR", "Marketing", "Sales", "Finance" };
                             var dept = departments[random.Next(departments.Length)];
-                            await repo.SearchRecordsAsync("department", dept);
+                            await repo.SearchTypedRecordsAsync("department", dept);
                             break;
 
                         case 3: // Count
@@ -272,7 +295,7 @@ namespace TestUtils
             }
 
             overallStopwatch.Stop();
-            Console.WriteLine($"\nStress test completed:");
+            Console.WriteLine($"\nEmployees stress test completed:");
             Console.WriteLine($"  Total time: {overallStopwatch.ElapsedMilliseconds}ms");
             Console.WriteLine($"  Successful operations: {successCount}/{iterations} ({100.0 * successCount / iterations:F1}%)");
             Console.WriteLine($"  Failed operations: {failureCount}");

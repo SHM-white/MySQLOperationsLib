@@ -68,7 +68,7 @@ namespace RepositoriesCore
             {
                 { "UUID", record.UUID },
                 { "log_id", record.LogId },
-                { "employee_id", record.EmployeeId },
+                { "user_id", record.UserId },
                 { "activity_type", record.ActivityType },
                 { "start_time", record.StartTime },
                 { "end_time", record.EndTime },
@@ -83,15 +83,15 @@ namespace RepositoriesCore
             try
             {
                 var uuid = RepositoriesTypeHelper.GetStringValue(dict, "UUID") ?? "";
-                var logId = RepositoriesTypeHelper.GetIntValue(dict, "log_id") ?? 0;
-                var employeeId = RepositoriesTypeHelper.GetIntValue(dict, "employee_id") ?? 0;
+                var logId = RepositoriesTypeHelper.GetStringValue(dict, "log_id") ?? "";
+                var UserId = RepositoriesTypeHelper.GetStringValue(dict, "user_id") ?? "";
                 var activityType = RepositoriesTypeHelper.GetStringValue(dict, "activity_type") ?? "";
                 var startTime = RepositoriesTypeHelper.GetDateTimeValue(dict, "start_time") ?? DateTime.Now;
                 var endTime = RepositoriesTypeHelper.GetDateTimeValue(dict, "end_time") ?? DateTime.Now;
                 var duration = RepositoriesTypeHelper.GetIntValue(dict, "duration") ?? 0;
                 var createdAt = RepositoriesTypeHelper.GetDateTimeValue(dict, "created_at") ?? DateTime.Now;
 
-                return new ActivityLogRecord(uuid, logId, employeeId, activityType, startTime, endTime, duration, createdAt);
+                return new ActivityLogRecord(uuid, logId, UserId, activityType, startTime, endTime, duration, createdAt);
             }
             catch (Exception ex)
             {
@@ -100,9 +100,9 @@ namespace RepositoriesCore
         }
     }
 
-    internal class RepositoriesTypeHelper
+    internal static class RepositoriesTypeHelper
     {
-        public static string? GetStringValue(Dictionary<string, object?> dict, string key)
+        public static string? GetStringValue(this Dictionary<string, object?> dict, string key)
         {
             if (dict.TryGetValue(key, out var value) && value != null)
             {
@@ -111,7 +111,7 @@ namespace RepositoriesCore
             return null;
         }
 
-        public static DateTime? GetDateTimeValue(Dictionary<string, object?> dict, string key)
+        public static DateTime? GetDateTimeValue(this Dictionary<string, object?> dict, string key)
         {
             if (dict.TryGetValue(key, out var value) && value != null)
             {
@@ -126,7 +126,7 @@ namespace RepositoriesCore
             }
             return null;
         }
-        public static int? GetIntValue(Dictionary<string, object?> dict, string key)
+        public static int? GetIntValue(this Dictionary<string, object?> dict, string key)
         {
             if (dict.TryGetValue(key, out var value) && value != null)
             {
@@ -145,5 +145,6 @@ namespace RepositoriesCore
             }
             return null;
         }
+        
     }
 }

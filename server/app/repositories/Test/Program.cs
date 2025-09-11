@@ -24,7 +24,8 @@ namespace Test
                 Console.WriteLine($"Activity logs repo sheet name: {activityLogsRepo.SheetName}");
 
                 // 初始化数据库
-                await InitializeDatabases(employeesRepo, activityLogsRepo);
+                await employeesRepo.InitializeDatabaseAsync(employeesRepo.databaseDefinition);
+                await activityLogsRepo.InitializeDatabaseAsync(activityLogsRepo.databaseDefinition);
 
                 // 运行员工仓储测试
                 Console.WriteLine("\n" + "=".PadRight(60, '='));
@@ -64,22 +65,6 @@ namespace Test
             }
         }
 
-        private static async Task InitializeDatabases(EmployeesRepository employeesRepo, ActivityLogsRepository activityLogsRepo)
-        {
-            if (!await employeesRepo.DatabaseIsInitializedAsync())
-            {
-                Console.WriteLine("Initializing employees database...");
-                await employeesRepo.InitializeDatabaseAsync(employeesRepo.DatabaseDefinition);
-                Console.WriteLine("Employees database initialized successfully.");
-            }
-
-            if (!await activityLogsRepo.DatabaseIsInitializedAsync())
-            {
-                Console.WriteLine("Initializing activity logs database...");
-                await activityLogsRepo.InitializeDatabaseAsync(activityLogsRepo.DatabaseDefinition);
-                Console.WriteLine("Activity logs database initialized successfully.");
-            }
-        }
 
         private static async Task RunEmployeesRepositoryTests(EmployeesRepository repo)
         {
@@ -258,7 +243,7 @@ namespace Test
                 Console.WriteLine($"✓ ReadTypedRecordsAsync result: Found {readRecords?.Length ?? 0} records");
                 if (readRecords != null && readRecords.Length > 0)
                 {
-                    Console.WriteLine($"  First record: Employee {readRecords[0].EmployeeId} - {readRecords[0].ActivityType}");
+                    Console.WriteLine($"  First record: Employee {readRecords[0].UserId} - {readRecords[0].ActivityType}");
                     Console.WriteLine($"  Record details: UUID={readRecords[0].UUID}, Duration={readRecords[0].Duration}s");
                 }
             }
@@ -295,7 +280,7 @@ namespace Test
                 {
                     foreach (var log in typeResults)
                     {
-                        Console.WriteLine($"  - Employee {log.EmployeeId}: {log.Duration}s");
+                        Console.WriteLine($"  - Employee {log.UserId}: {log.Duration}s");
                     }
                 }
             }
@@ -354,7 +339,7 @@ namespace Test
                     // 删除最后一个记录
                     var recordToDelete = readRecords[^1];
                     var deleteResult = await repo.DeleteRecordsAsync(new[] { recordToDelete.UUID });
-                    Console.WriteLine($"✓ DeleteRecordsAsync result: {deleteResult} (Deleted activity log for employee {recordToDelete.EmployeeId})");
+                    Console.WriteLine($"✓ DeleteRecordsAsync result: {deleteResult} (Deleted activity log for employee {recordToDelete.UserId})");
                     
                     // 验证删除
                     var verifyAfterDelete = await repo.ReadTypedRecordsAsync(new[] { recordToDelete.UUID });
@@ -419,45 +404,45 @@ namespace Test
             };
         }
 
-        private static ActivityLogsRepository.ActivityLogRecord[] CreateTestActivityLogs()
+        private static RepositoriesCore.ActivityLogsRepository.ActivityLogRecord[] CreateTestActivityLogs()
         {
             var now = DateTime.Now;
             return new[]
             {
-                new ActivityLogsRepository.ActivityLogRecord(
+                new RepositoriesCore.ActivityLogsRepository.ActivityLogRecord(
                     UUID: Guid.NewGuid().ToString(),
-                    LogId: 0, // Will be auto-generated
-                    EmployeeId: 1001,
+                    LogId: Guid.NewGuid().ToString("N")[..8], // Generate unique string LogId
+                    UserId: "USER001",
                     ActivityType: "sit",
                     StartTime: now.AddMinutes(-30),
                     EndTime: now.AddMinutes(-15),
                     Duration: 900, // 15 minutes
                     CreatedAt: now
                 ),
-                new ActivityLogsRepository.ActivityLogRecord(
+                new RepositoriesCore.ActivityLogsRepository.ActivityLogRecord(
                     UUID: Guid.NewGuid().ToString(),
-                    LogId: 0, // Will be auto-generated
-                    EmployeeId: 1001,
+                    LogId: Guid.NewGuid().ToString("N")[..8], // Generate unique string LogId
+                    UserId: "USER002",
                     ActivityType: "stand",
                     StartTime: now.AddMinutes(-15),
                     EndTime: now.AddMinutes(-10),
                     Duration: 300, // 5 minutes
                     CreatedAt: now
                 ),
-                new ActivityLogsRepository.ActivityLogRecord(
+                new RepositoriesCore.ActivityLogsRepository.ActivityLogRecord(
                     UUID: Guid.NewGuid().ToString(),
-                    LogId: 0, // Will be auto-generated
-                    EmployeeId: 1002,
+                    LogId: Guid.NewGuid().ToString("N")[..8], // Generate unique string LogId
+                    UserId: "USER003",
                     ActivityType: "walk",
                     StartTime: now.AddMinutes(-45),
                     EndTime: now.AddMinutes(-40),
                     Duration: 300, // 5 minutes
                     CreatedAt: now
                 ),
-                new ActivityLogsRepository.ActivityLogRecord(
+                new RepositoriesCore.ActivityLogsRepository.ActivityLogRecord(
                     UUID: Guid.NewGuid().ToString(),
-                    LogId: 0, // Will be auto-generated
-                    EmployeeId: 1002,
+                    LogId: Guid.NewGuid().ToString("N")[..8], // Generate unique string LogId
+                    UserId : "USER004",
                     ActivityType: "meeting",
                     StartTime: now.AddMinutes(-60),
                     EndTime: now.AddMinutes(-30),
@@ -676,10 +661,10 @@ namespace Test
         private static async Task AddTestActivityLog(ActivityLogsRepository repo)
         {
             var now = DateTime.Now;
-            var testLog = new ActivityLogsRepository.ActivityLogRecord(
+            var testLog = new RepositoriesCore.ActivityLogsRepository.ActivityLogRecord(
                 UUID: Guid.NewGuid().ToString(),
-                LogId: 0, // Auto-generated
-                EmployeeId: new Random().Next(1000, 2000),
+                LogId: Guid.NewGuid().ToString("N")[..8], // Generate unique string LogId
+                UserId: $"USER{ new Random().Next(1, 999) :D3}",
                 ActivityType: "test_activity",
                 StartTime: now.AddMinutes(-10),
                 EndTime: now,
@@ -688,7 +673,7 @@ namespace Test
             );
 
             var result = await repo.AddNewTypedRecordsAsync(new[] { testLog });
-            Console.WriteLine($"Added test activity log: Employee {testLog.EmployeeId} - {testLog.ActivityType} - Result: {result}");
+            Console.WriteLine($"Added test activity log: Employee {testLog.UserId} - {testLog.ActivityType} - Result: {result}");
         }
 
         private static async Task ListAllEmployees(EmployeesRepository repo)
@@ -730,7 +715,7 @@ namespace Test
                 Console.WriteLine($"Found {logs.Length} activity logs (showing first 20):");
                 foreach (var log in logs)
                 {
-                    Console.WriteLine($"  - Employee {log.EmployeeId}: {log.ActivityType} ({log.Duration}s) - {log.StartTime:HH:mm:ss}");
+                    Console.WriteLine($"  - Employee {log.UserId}: {log.ActivityType} ({log.Duration}s) - {log.StartTime:HH:mm:ss}");
                 }
             }
             else
@@ -764,7 +749,7 @@ namespace Test
                 Console.WriteLine($"Found {results.Length} '{activityType}' activity logs:");
                 foreach (var log in results)
                 {
-                    Console.WriteLine($"  - Employee {log.EmployeeId}: {log.Duration}s at {log.StartTime:HH:mm:ss}");
+                    Console.WriteLine($"  - Employee {log.UserId}: {log.Duration}s at {log.StartTime:HH:mm:ss}");
                 }
             }
             else

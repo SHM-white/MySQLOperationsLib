@@ -16,7 +16,7 @@ namespace UnitTest
         {
             var repo = new RepositoriesCore.EmployeesRepository("Server=localhost;Database=TestDB;User Id=test;Password=test;");
 
-            var initResult = await repo.InitializeDatabaseAsync(repo.DatabaseDefinition);
+            var initResult = await repo.InitializeDatabaseAsync(repo.databaseDefinition);
             var isInitialized = await repo.DatabaseIsInitializedAsync();
             
             // 验证数据库初始化
@@ -29,7 +29,7 @@ namespace UnitTest
         {
             var repo = new RepositoriesCore.ActivityLogsRepository("Server=localhost;Database=TestDB;User Id=test;Password=test;");
 
-            var initResult = await repo.InitializeDatabaseAsync(repo.DatabaseDefinition);
+            var initResult = await repo.InitializeDatabaseAsync(repo.databaseDefinition);
             var isInitialized = await repo.DatabaseIsInitializedAsync();
             
             // 验证数据库初始化
@@ -44,7 +44,7 @@ namespace UnitTest
             try
             {
                 // 确保数据库已初始化
-                await repo.InitializeDatabaseAsync(repo.DatabaseDefinition);
+                await repo.InitializeDatabaseAsync(repo.databaseDefinition);
 
                 // 1. 测试添加记录
                 var testEmployees = CreateTestEmployees();
@@ -105,7 +105,7 @@ namespace UnitTest
             try
             {
                 // 确保数据库已初始化
-                await repo.InitializeDatabaseAsync(repo.DatabaseDefinition);
+                await repo.InitializeDatabaseAsync(repo.databaseDefinition);
 
                 // 1. 测试添加记录
                 var testActivityLogs = CreateTestActivityLogs();
@@ -127,7 +127,7 @@ namespace UnitTest
                 // 4. 测试按员工ID搜索
                 var employeeResults = await repo.GetActivityLogsByEmployeeIdAsync(1001);
                 Assert.IsNotNull(employeeResults, "Employee search results should not be null");
-                var employee1001Count = testActivityLogs.Count(e => e.EmployeeId == 1001);
+                var employee1001Count = testActivityLogs.Count(e => e.UserId == 1001);
                 Assert.AreEqual(employee1001Count, employeeResults.Length, "Should find correct number of activities for employee 1001");
 
                 // 5. 测试日期范围搜索
@@ -224,8 +224,8 @@ namespace UnitTest
             
             try
             {
-                await employeesRepo.InitializeDatabaseAsync(employeesRepo.DatabaseDefinition);
-                await activityLogsRepo.InitializeDatabaseAsync(activityLogsRepo.DatabaseDefinition);
+                await employeesRepo.InitializeDatabaseAsync(employeesRepo.databaseDefinition);
+                await activityLogsRepo.InitializeDatabaseAsync(activityLogsRepo.databaseDefinition);
 
                 // 并发测试
                 var tasks = new List<Task<bool>>();
@@ -274,8 +274,8 @@ namespace UnitTest
             
             try
             {
-                await employeesRepo.InitializeDatabaseAsync(employeesRepo.DatabaseDefinition);
-                await activityLogsRepo.InitializeDatabaseAsync(activityLogsRepo.DatabaseDefinition);
+                await employeesRepo.InitializeDatabaseAsync(employeesRepo.databaseDefinition);
+                await activityLogsRepo.InitializeDatabaseAsync(activityLogsRepo.databaseDefinition);
 
                 // 测试读取不存在的记录 - 员工
                 var nonExistentEmployees = await employeesRepo.ReadTypedRecordsAsync(new[] { "non-existent-uuid" });
@@ -308,7 +308,7 @@ namespace UnitTest
                 await Assert.ThrowsExceptionAsync<ArgumentException>(async () =>
                 {
                     await activityLogsRepo.UpdateTypedRecordAsync("", new RepositoriesCore.ActivityLogsRepository.ActivityLogRecord(
-                        "", 0, 0, "", DateTime.Now, DateTime.Now, 0, DateTime.Now));
+                        "", "", 0, "", DateTime.Now, DateTime.Now, 0, DateTime.Now));
                 }, "Update activity log with empty UUID should throw ArgumentException");
             }
             catch (Exception ex) when (ex.Message.Contains("connection") || ex.Message.Contains("database"))
@@ -373,7 +373,7 @@ namespace UnitTest
             var now = DateTime.Now;
             var testRecord = new RepositoriesCore.ActivityLogsRepository.ActivityLogRecord(
                 UUID: "test-uuid",
-                LogId: 123,
+                LogId: "TEST123",
                 EmployeeId: 1001,
                 ActivityType: "sit",
                 StartTime: now.AddMinutes(-30),
@@ -386,8 +386,8 @@ namespace UnitTest
             var dict = repo.RecordToDict(testRecord);
             Assert.IsNotNull(dict, "Activity log record conversion should not return null");
             Assert.AreEqual("test-uuid", dict["UUID"], "UUID should be converted correctly");
-            Assert.AreEqual(123, dict["log_id"], "LogId should be converted correctly");
-            Assert.AreEqual(1001, dict["employee_id"], "EmployeeId should be converted correctly");
+            Assert.AreEqual("TEST123", dict["log_id"], "LogId should be converted correctly");
+            Assert.AreEqual(1001, dict["user_id"], "EmployeeId should be converted correctly");
             Assert.AreEqual("sit", dict["activity_type"], "ActivityType should be converted correctly");
             Assert.AreEqual(1800, dict["duration"], "Duration should be converted correctly");
 
@@ -396,7 +396,7 @@ namespace UnitTest
             Assert.IsNotNull(convertedRecord, "Dictionary to activity log record conversion should not return null");
             Assert.AreEqual(testRecord.UUID, convertedRecord.UUID, "UUID should match after conversion");
             Assert.AreEqual(testRecord.LogId, convertedRecord.LogId, "LogId should match after conversion");
-            Assert.AreEqual(testRecord.EmployeeId, convertedRecord.EmployeeId, "EmployeeId should match after conversion");
+            Assert.AreEqual(testRecord.UserId, convertedRecord.UserId, "EmployeeId should match after conversion");
             Assert.AreEqual(testRecord.ActivityType, convertedRecord.ActivityType, "ActivityType should match after conversion");
             Assert.AreEqual(testRecord.Duration, convertedRecord.Duration, "Duration should match after conversion");
 
@@ -500,7 +500,7 @@ namespace UnitTest
             {
                 new RepositoriesCore.ActivityLogsRepository.ActivityLogRecord(
                     UUID: Guid.NewGuid().ToString(),
-                    LogId: 0, // Will be auto-generated
+                    LogId: Guid.NewGuid().ToString("N")[..8], // Generate unique string LogId
                     EmployeeId: 1001,
                     ActivityType: "sit",
                     StartTime: now.AddMinutes(-30),
@@ -510,7 +510,7 @@ namespace UnitTest
                 ),
                 new RepositoriesCore.ActivityLogsRepository.ActivityLogRecord(
                     UUID: Guid.NewGuid().ToString(),
-                    LogId: 0, // Will be auto-generated
+                    LogId: Guid.NewGuid().ToString("N")[..8], // Generate unique string LogId
                     EmployeeId: 1001,
                     ActivityType: "stand",
                     StartTime: now.AddMinutes(-15),
@@ -520,7 +520,7 @@ namespace UnitTest
                 ),
                 new RepositoriesCore.ActivityLogsRepository.ActivityLogRecord(
                     UUID: Guid.NewGuid().ToString(),
-                    LogId: 0, // Will be auto-generated
+                    LogId: Guid.NewGuid().ToString("N")[..8], // Generate unique string LogId
                     EmployeeId: 1002,
                     ActivityType: "walk",
                     StartTime: now.AddMinutes(-45),
@@ -530,7 +530,7 @@ namespace UnitTest
                 ),
                 new RepositoriesCore.ActivityLogsRepository.ActivityLogRecord(
                     UUID: Guid.NewGuid().ToString(),
-                    LogId: 0, // Will be auto-generated
+                    LogId: Guid.NewGuid().ToString("N")[..8], // Generate unique string LogId
                     EmployeeId: 1002,
                     ActivityType: "meeting",
                     StartTime: now.AddMinutes(-60),

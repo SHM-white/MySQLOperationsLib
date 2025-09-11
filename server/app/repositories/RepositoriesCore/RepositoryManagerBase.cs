@@ -8,7 +8,7 @@ namespace RepositoriesCore
     public abstract partial class RepositoryManagerBase : IRepository, IDisposable
     {
         // Database structure definition
-        public abstract IEnumerable<ColumnDefinition> DatabaseDefinition { get; }
+        public abstract IEnumerable<ColumnDefinition> databaseDefinition { get; }
 
         // Properties and fields
         private string _connectionString = connectionString ?? string.Empty;
@@ -224,7 +224,7 @@ namespace RepositoriesCore
             while (await reader.ReadAsync())
             {
                 var record = new Dictionary<string, object?>();
-                foreach (var col in DatabaseDefinition)
+                foreach (var col in databaseDefinition)
                 {
                     record[col.Name] = reader[col.Name] is DBNull ? null : reader[col.Name];
                 }
@@ -245,11 +245,11 @@ namespace RepositoriesCore
             foreach (var record in records)
             {
                 sqlCommand.AppendLine($"INSERT INTO `{SheetName}` (");
-                var columnNames = DatabaseDefinition.Where(c => !c.AutoIncrement).Select(c => $"`{c.Name}`");
+                var columnNames = databaseDefinition.Where(c => !c.AutoIncrement).Select(c => $"`{c.Name}`");
                 sqlCommand.AppendLine(string.Join(", ", columnNames));
                 sqlCommand.AppendLine(") VALUES (");
                 var values = new List<string>();
-                foreach (var col in DatabaseDefinition)
+                foreach (var col in databaseDefinition)
                 {
                     if (col.AutoIncrement) continue; // 跳过自增列
                     if (record.TryGetValue(col.Name, out var value) && value != null)
@@ -314,7 +314,7 @@ namespace RepositoriesCore
                 var value = kvp.Value;
                 
                 // 跳过主键列
-                var columnDef = DatabaseDefinition.FirstOrDefault(c => c.Name == columnName);
+                var columnDef = databaseDefinition.FirstOrDefault(c => c.Name == columnName);
                 if (columnDef?.IsPrimaryKey == true) continue;
                 
                 if (value is string strVal)
@@ -392,7 +392,7 @@ namespace RepositoriesCore
             while (await reader.ReadAsync())
             {
                 var record = new Dictionary<string, object?>();
-                foreach (var col in DatabaseDefinition)
+                foreach (var col in databaseDefinition)
                 {
                     record[col.Name] = reader[col.Name] is DBNull ? null : reader[col.Name];
                 }

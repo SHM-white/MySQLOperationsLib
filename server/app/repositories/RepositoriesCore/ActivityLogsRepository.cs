@@ -5,7 +5,7 @@ namespace RepositoriesCore
 {
     public class ActivityLogsRepository(string? connectionString) : RepositoryManagerBase<ActivityLogsRepository.ActivityLogRecord>(connectionString, "activity_logs")
     {
-        public override IEnumerable<ColumnDefinition> DatabaseDefinition => _databaseDefinition;
+        public override IEnumerable<ColumnDefinition> databaseDefinition => DatabaseDefinition;
 
         // Implement the abstract methods for type conversion
         public override Dictionary<string, object?>? RecordToDict(ActivityLogRecord? record)
@@ -25,7 +25,7 @@ namespace RepositoriesCore
         /// </summary>
         public async Task<ActivityLogRecord[]?> GetActivityLogsByEmployeeIdAsync(int employeeId)
         {
-            return await SearchTypedRecordsAsync("employee_id", employeeId);
+            return await SearchTypedRecordsAsync("user_id", employeeId);
         }
 
         /// <summary>
@@ -44,7 +44,7 @@ namespace RepositoriesCore
             using var connection = await TryConnectAsync() ?? throw new InvalidOperationException("Cannot establish database connection.");
             
             var sql = $@"SELECT * FROM `{SheetName}` 
-                        WHERE `employee_id` = @employeeId 
+                        WHERE `user_id` = @employeeId 
                         AND `start_time` >= @startDate 
                         AND `end_time` <= @endDate 
                         ORDER BY `start_time`";
@@ -60,7 +60,7 @@ namespace RepositoriesCore
             while (await reader.ReadAsync())
             {
                 var record = new Dictionary<string, object?>();
-                foreach (var col in DatabaseDefinition)
+                foreach (var col in databaseDefinition)
                 {
                     record[col.Name] = reader[col.Name] is DBNull ? null : reader[col.Name];
                 }
@@ -75,24 +75,24 @@ namespace RepositoriesCore
             return [.. results];
         }
 
-        // Activity log record definition
+        // Activity log record definition - LogId changed to string
         public record ActivityLogRecord(
             string UUID,
-            int LogId,
-            int EmployeeId,
-            string ActivityType,
+            string LogId,
+            string UserId,
+            string ActivityType,    
             DateTime StartTime,
             DateTime EndTime,
             int Duration,
             DateTime CreatedAt
         );
         
-        // Database definition based on the provided table structure
-        private readonly IEnumerable<ColumnDefinition> _databaseDefinition =
+        // Database definition based on the provided table structure - log_id changed to string
+        public static readonly IEnumerable<ColumnDefinition> DatabaseDefinition =
         [
-            new (Name:"UUID", Type:DbColumnType.String, Length:255, IsPrimaryKey:true, IsNullable:false, Comment:"记录uuid，主键"),
-            new (Name:"log_id", Type:DbColumnType.Int32, IsNullable:false, AutoIncrement:true, Comment:"记录ID"),
-            new (Name:"employee_id", Type:DbColumnType.Int32, IsNullable:false, IsIndexed:true, Comment:"员工ID，外键关联employees表"),
+            new (Name:"UUID", Type:DbColumnType.Guid, IsPrimaryKey:true, IsNullable:false, Comment:"记录uuid，主键"),
+            new (Name:"log_id", Type:DbColumnType.String, Length:50, IsNullable:false, IsIndexed:true, Comment:"记录ID"),
+            new (Name:"user_id", Type:DbColumnType.String, Length:50, IsNullable:false, IsIndexed:true, Comment:"员工ID，外键关联employees表"),
             new (Name:"activity_type", Type:DbColumnType.String, Length:20, IsNullable:false, IsIndexed:true, Comment:"活动类型(sit/stand/walk/meeting)"),
             new (Name:"start_time", Type:DbColumnType.DateTime, IsNullable:false, IsIndexed:true, Comment:"活动开始时间"),
             new (Name:"end_time", Type:DbColumnType.DateTime, IsNullable:false, Comment:"活动结束时间"),

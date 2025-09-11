@@ -5,7 +5,7 @@ namespace RepositoriesCore
 {
     public partial interface IRepository
     {
-        IEnumerable<ColumnDefinition> DatabaseDefinition { get; } // 数据库表定义
+        IEnumerable<ColumnDefinition> databaseDefinition { get; } // 数据库表定义
         string ConnectionString { get; set; } // 数据库连接字符串
         string SheetName { get; } // 数据库表名称
         void Dispose(); // 释放资源

@@ -184,8 +184,8 @@ namespace TestUtils
                 
                 logs[i] = new ActivityLogsRepository.ActivityLogRecord(
                     UUID: Guid.NewGuid().ToString(),
-                    LogId: 0, // Will be auto-generated
-                    EmployeeId: 1000 + random.Next(1, 100), // Employee IDs from 1001-1100
+                    LogId: $"LOG{DateTime.Now.Ticks % 1000000:D6}{i:D4}", // Generate unique string LogId
+                    UserId: $"USER{random.Next(1, 999):D3}", // User IDs from USER001-USER100
                     ActivityType: activityTypes[random.Next(activityTypes.Length)],
                     StartTime: startTime,
                     EndTime: endTime,

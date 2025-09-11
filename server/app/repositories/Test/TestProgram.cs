@@ -801,7 +801,26 @@ namespace Test
             var uuids = new List<string>();
             while (await reader.ReadAsync())
             {
-                uuids.Add(reader.GetString("UUID"));
+                var uuidValue = reader["UUID"];
+                string uuidString;
+                
+                if (uuidValue is Guid guidValue)
+                {
+                    uuidString = guidValue.ToString();
+                }
+                else if (uuidValue is string stringValue)
+                {
+                    uuidString = stringValue;
+                }
+                else
+                {
+                    uuidString = uuidValue.ToString() ?? string.Empty;
+                }
+                
+                if (!string.IsNullOrEmpty(uuidString))
+                {
+                    uuids.Add(uuidString);
+                }
             }
             return uuids.ToArray();
         }
@@ -816,7 +835,26 @@ namespace Test
             var uuids = new List<string>();
             while (await reader.ReadAsync())
             {
-                uuids.Add(reader.GetString("UUID"));
+                var uuidValue = reader["UUID"];
+                string uuidString;
+                
+                if (uuidValue is Guid guidValue)
+                {
+                    uuidString = guidValue.ToString();
+                }
+                else if (uuidValue is string stringValue)
+                {
+                    uuidString = stringValue;
+                }
+                else
+                {
+                    uuidString = uuidValue.ToString() ?? string.Empty;
+                }
+                
+                if (!string.IsNullOrEmpty(uuidString))
+                {
+                    uuids.Add(uuidString);
+                }
             }
             return uuids.ToArray();
         }

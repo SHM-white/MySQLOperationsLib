@@ -180,13 +180,16 @@ namespace TestUtils
             for (int i = 0; i < count; i++)
             {
                 var now = DateTime.Now.AddMinutes(-random.Next(0, 10000)); // 随机时间
+                var theme = random.Next(2) == 0 ? "dark" : "light";
+                var notifications = random.Next(2) == 0 ? "true" : "false";
+                
                 employees[i] = new EmployeesRepository.EmployeeRecord(
                     UUID: Guid.NewGuid().ToString(),
                     UserId: $"PERF{i:D6}",
                     Name: $"Performance Test Employee {i}",
                     Department: departments[random.Next(departments.Length)],
                     WorkstationId: random.Next(2) == 0 ? $"WS-PERF-{i:D3}" : null,
-                    Preference: random.Next(2) == 0 ? $$$"""{"theme": "{{{(random.Next(2) == 0 ? "dark" : "light")}}}", "notifications": {{{(random.Next(2) == 0 ? "true" : "false")}}}""" : null,
+                    Preference: random.Next(2) == 0 ? $"{{\"theme\": \"{theme}\", \"notifications\": {notifications}}}" : null,
                     Online: false,
                     CreatedAt: now,
                     UpdatedAt: now
@@ -206,7 +209,26 @@ namespace TestUtils
             var uuids = new List<string>();
             while (await reader.ReadAsync())
             {
-                uuids.Add(reader.GetString("UUID"));
+                var uuidValue = reader["UUID"];
+                string uuidString;
+                
+                if (uuidValue is Guid guidValue)
+                {
+                    uuidString = guidValue.ToString();
+                }
+                else if (uuidValue is string stringValue)
+                {
+                    uuidString = stringValue;
+                }
+                else
+                {
+                    uuidString = uuidValue.ToString() ?? string.Empty;
+                }
+                
+                if (!string.IsNullOrEmpty(uuidString))
+                {
+                    uuids.Add(uuidString);
+                }
             }
             return uuids.ToArray();
         }

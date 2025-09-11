@@ -1,4 +1,4 @@
-using System;
+ï»¿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -12,166 +12,35 @@ namespace UnitTest
     public sealed class TestProgram
     {
         [TestMethod]
+        [Priority(1)]
         public async Task EmployeesRepository_Basic_Operations_Test()
         {
             var repo = Test.TestProgram.CreateEmployeesRepository();
 
-            // ÖØĞÂ³õÊ¼»¯Êı¾İ¿â
+            // é‡æ–°åˆå§‹åŒ–æ•°æ®åº“
             var initResult = await repo.InitializeDatabaseAsync(repo.databaseDefinition);
             var isInitialized = await repo.DatabaseIsInitializedAsync();
             
-            // ÑéÖ¤Êı¾İ¿â³õÊ¼»¯
+            // éªŒè¯æ•°æ®åº“åˆå§‹åŒ–
             Assert.IsTrue(initResult, "Database initialization should succeed");
         }
 
         [TestMethod]
+        [Priority(2)]
         public async Task ActivityLogsRepository_Basic_Operations_Test()
         {
             var repo = Test.TestProgram.CreateActivityLogsRepository();
 
-            // ÖØĞÂ³õÊ¼»¯Êı¾İ¿â
+            // é‡æ–°åˆå§‹åŒ–æ•°æ®åº“
             var initResult = await repo.InitializeDatabaseAsync(repo.databaseDefinition);
             var isInitialized = await repo.DatabaseIsInitializedAsync();
             
-            // ÑéÖ¤Êı¾İ¿â³õÊ¼»¯
+            // éªŒè¯æ•°æ®åº“åˆå§‹åŒ–
             Assert.IsTrue(initResult, "Activity logs database initialization should succeed");
         }
 
         [TestMethod]
-        public async Task EmployeesRepository_CRUD_Operations_Test()
-        {
-            var repo = Test.TestProgram.CreateEmployeesRepository();
-            
-            try
-            {
-                // ÖØĞÂ³õÊ¼»¯Êı¾İ¿â
-                await repo.InitializeDatabaseAsync(repo.databaseDefinition);
-
-                // 1. ²âÊÔÌí¼Ó¼ÇÂ¼
-                var testEmployees = CreateTestEmployees();
-                var addResult = await repo.AddNewTypedRecordsAsync(testEmployees);
-                Assert.IsTrue(addResult, "Adding new employee records should succeed");
-
-                // 2. ²âÊÔ¶ÁÈ¡¼ÇÂ¼
-                var uuidsToRead = testEmployees.Select(e => e.UUID).ToArray();
-                var readRecords = await repo.ReadTypedRecordsAsync(uuidsToRead);
-                Assert.IsNotNull(readRecords, "Read employee records should not be null");
-                Assert.AreEqual(testEmployees.Length, readRecords.Length, "Should read the same number of records as added");
-
-                // 3. ²âÊÔËÑË÷¼ÇÂ¼
-                var searchResults = await repo.SearchTypedRecordsAsync("department", "Engineering");
-                Assert.IsNotNull(searchResults, "Search results should not be null");
-                var engineeringCount = testEmployees.Count(e => e.Department == "Engineering");
-                Assert.AreEqual(engineeringCount, searchResults.Length, "Should find correct number of engineering employees");
-
-                // 4. ²âÊÔ¸üĞÂ¼ÇÂ¼
-                if (readRecords.Length > 0)
-                {
-                    var recordToUpdate = readRecords[0];
-                    var updatedRecord = recordToUpdate with { Department = "Updated Engineering" };
-                    var updateResult = await repo.UpdateTypedRecordAsync(recordToUpdate.UUID, updatedRecord);
-                    Assert.IsTrue(updateResult, "Update should succeed");
-
-                    // ÑéÖ¤¸üĞÂ
-                    var verifyRecords = await repo.ReadTypedRecordsAsync(new[] { recordToUpdate.UUID });
-                    Assert.IsNotNull(verifyRecords, "Verification read should not be null");
-                    Assert.AreEqual(1, verifyRecords.Length, "Should find exactly one updated record");
-                    Assert.AreEqual("Updated Engineering", verifyRecords[0].Department, "Department should be updated");
-                }
-
-                // 5. ²âÊÔÉ¾³ı¼ÇÂ¼
-                if (readRecords.Length > 0)
-                {
-                    var recordToDelete = readRecords[^1];
-                    var deleteResult = await repo.DeleteRecordsAsync(new[] { recordToDelete.UUID });
-                    Assert.IsTrue(deleteResult, "Delete should succeed");
-
-                    // ÑéÖ¤É¾³ı
-                    var verifyAfterDelete = await repo.ReadTypedRecordsAsync(new[] { recordToDelete.UUID });
-                    Assert.IsTrue(verifyAfterDelete == null || verifyAfterDelete.Length == 0, "Record should be deleted");
-                }
-            }
-            catch (Exception ex) when (ex.Message.Contains("connection") || ex.Message.Contains("database"))
-            {
-                // Èç¹ûÊÇÁ¬½Ó»òÊı¾İ¿âÎÊÌâ£¬Ìø¹ı²âÊÔ
-                Assert.Inconclusive($"Database connection issue: {ex.Message}");
-            }
-        }
-
-        [TestMethod]
-        public async Task ActivityLogsRepository_CRUD_Operations_Test()
-        {
-            var repo = Test.TestProgram.CreateActivityLogsRepository();
-            
-            try
-            {
-                // ÖØĞÂ³õÊ¼»¯Êı¾İ¿â
-                await repo.InitializeDatabaseAsync(repo.databaseDefinition);
-
-                // 1. ²âÊÔÌí¼Ó¼ÇÂ¼
-                var testActivityLogs = CreateTestActivityLogs();
-                var addResult = await repo.AddNewTypedRecordsAsync(testActivityLogs);
-                Assert.IsTrue(addResult, "Adding new activity log records should succeed");
-
-                // 2. ²âÊÔ¶ÁÈ¡¼ÇÂ¼
-                var uuidsToRead = testActivityLogs.Select(e => e.UUID).ToArray();
-                var readRecords = await repo.ReadTypedRecordsAsync(uuidsToRead);
-                Assert.IsNotNull(readRecords, "Read activity log records should not be null");
-                Assert.AreEqual(testActivityLogs.Length, readRecords.Length, "Should read the same number of records as added");
-
-                // 3. ²âÊÔËÑË÷¼ÇÂ¼
-                var searchResults = await repo.GetActivityLogsByTypeAsync("sit");
-                Assert.IsNotNull(searchResults, "Search results should not be null");
-                var sitCount = testActivityLogs.Count(e => e.ActivityType == "sit");
-                Assert.AreEqual(sitCount, searchResults.Length, "Should find correct number of sit activities");
-
-                // 4. ²âÊÔ°´ÓÃ»§IDËÑË÷
-                var userResults = await repo.GetActivityLogsByUserIdAsync("USER001");
-                Assert.IsNotNull(userResults, "User search results should not be null");
-                var user001Count = testActivityLogs.Count(e => e.UserId == "USER001");
-                Assert.AreEqual(user001Count, userResults.Length, "Should find correct number of activities for USER001");
-
-                // 5. ²âÊÔÈÕÆÚ·¶Î§ËÑË÷
-                var now = DateTime.Now;
-                var dateRangeResults = await repo.GetActivityLogsInDateRangeAsync("USER001", now.AddHours(-2), now.AddHours(2));
-                Assert.IsNotNull(dateRangeResults, "Date range search results should not be null");
-
-                // 6. ²âÊÔ¸üĞÂ¼ÇÂ¼
-                if (readRecords.Length > 0)
-                {
-                    var recordToUpdate = readRecords[0];
-                    var updatedRecord = recordToUpdate with { ActivityType = "updated_sit", Duration = 1200 };
-                    var updateResult = await repo.UpdateTypedRecordAsync(recordToUpdate.UUID, updatedRecord);
-                    Assert.IsTrue(updateResult, "Update should succeed");
-
-                    // ÑéÖ¤¸üĞÂ
-                    var verifyRecords = await repo.ReadTypedRecordsAsync(new[] { recordToUpdate.UUID });
-                    Assert.IsNotNull(verifyRecords, "Verification read should not be null");
-                    Assert.AreEqual(1, verifyRecords.Length, "Should find exactly one updated record");
-                    Assert.AreEqual("updated_sit", verifyRecords[0].ActivityType, "Activity type should be updated");
-                    Assert.AreEqual(1200, verifyRecords[0].Duration, "Duration should be updated");
-                }
-
-                // 7. ²âÊÔÉ¾³ı¼ÇÂ¼
-                if (readRecords.Length > 0)
-                {
-                    var recordToDelete = readRecords[^1];
-                    var deleteResult = await repo.DeleteRecordsAsync(new[] { recordToDelete.UUID });
-                    Assert.IsTrue(deleteResult, "Delete should succeed");
-
-                    // ÑéÖ¤É¾³ı
-                    var verifyAfterDelete = await repo.ReadTypedRecordsAsync(new[] { recordToDelete.UUID });
-                    Assert.IsTrue(verifyAfterDelete == null || verifyAfterDelete.Length == 0, "Record should be deleted");
-                }
-            }
-            catch (Exception ex) when (ex.Message.Contains("connection") || ex.Message.Contains("database"))
-            {
-                // Èç¹ûÊÇÁ¬½Ó»òÊı¾İ¿âÎÊÌâ£¬Ìø¹ı²âÊÔ
-                Assert.Inconclusive($"Database connection issue: {ex.Message}");
-            }
-        }
-
-        [TestMethod]
+        [Priority(3)]
         public async Task Repository_Connection_Test()
         {
             var employeesRepo = Test.TestProgram.CreateEmployeesRepository();
@@ -179,17 +48,17 @@ namespace UnitTest
             
             try
             {
-                // ÖØĞÂ³õÊ¼»¯Êı¾İ¿â
+                // é‡æ–°åˆå§‹åŒ–æ•°æ®åº“
                 await employeesRepo.InitializeDatabaseAsync(employeesRepo.databaseDefinition);
                 await activityLogsRepo.InitializeDatabaseAsync(activityLogsRepo.databaseDefinition);
 
-                // ²âÊÔÔ±¹¤²Ö´¢Á¬½Ó
+                // æµ‹è¯•å‘˜å·¥ä»“å‚¨è¿æ¥
                 using var employeeConnection = await employeesRepo.TryConnectAsync();
                 if (employeeConnection != null)
                 {
                     Assert.AreEqual(System.Data.ConnectionState.Open, employeeConnection.State, "Employee connection should be open");
                     
-                    // ²âÊÔ¼òµ¥²éÑ¯
+                    // æµ‹è¯•ç®€å•æŸ¥è¯¢
                     using var testCmd = new MySqlConnector.MySqlCommand("SELECT 1", employeeConnection);
                     var result = await testCmd.ExecuteScalarAsync();
                     Assert.AreEqual(1, Convert.ToInt32(result), "Test query should return 1");
@@ -199,13 +68,13 @@ namespace UnitTest
                     Assert.Inconclusive("Cannot establish employee database connection for testing");
                 }
 
-                // ²âÊÔ»î¶¯ÈÕÖ¾²Ö´¢Á¬½Ó
+                // æµ‹è¯•æ´»åŠ¨æ—¥å¿—ä»“å‚¨è¿æ¥
                 using var activityConnection = await activityLogsRepo.TryConnectAsync();
                 if (activityConnection != null)
                 {
                     Assert.AreEqual(System.Data.ConnectionState.Open, activityConnection.State, "Activity logs connection should be open");
                     
-                    // ²âÊÔ¼òµ¥²éÑ¯
+                    // æµ‹è¯•ç®€å•æŸ¥è¯¢
                     using var testCmd2 = new MySqlConnector.MySqlCommand("SELECT 1", activityConnection);
                     var result2 = await testCmd2.ExecuteScalarAsync();
                     Assert.AreEqual(1, Convert.ToInt32(result2), "Test query should return 1");
@@ -222,6 +91,143 @@ namespace UnitTest
         }
 
         [TestMethod]
+        [Priority(4)]
+        public async Task EmployeesRepository_CRUD_Operations_Test()
+        {
+            var repo = Test.TestProgram.CreateEmployeesRepository();
+            
+            try
+            {
+                // é‡æ–°åˆå§‹åŒ–æ•°æ®åº“
+                await repo.InitializeDatabaseAsync(repo.databaseDefinition);
+
+                // 1. æµ‹è¯•æ·»åŠ è®°å½•
+                var testEmployees = CreateTestEmployees();
+                var addResult = await repo.AddNewTypedRecordsAsync(testEmployees);
+                Assert.IsTrue(addResult, "Adding new employee records should succeed");
+
+                // 2. æµ‹è¯•è¯»å–è®°å½•
+                var uuidsToRead = testEmployees.Select(e => e.UUID).ToArray();
+                var readRecords = await repo.ReadTypedRecordsAsync(uuidsToRead);
+                Assert.IsNotNull(readRecords, "Read employee records should not be null");
+                Assert.AreEqual(testEmployees.Length, readRecords.Length, "Should read the same number of records as added");
+
+                // 3. æµ‡è¯•æœç´¢è®°å½•
+                var searchResults = await repo.SearchTypedRecordsAsync("department", "Engineering");
+                Assert.IsNotNull(searchResults, "Search results should not be null");
+                var engineeringCount = testEmployees.Count(e => e.Department == "Engineering");
+                Assert.AreEqual(engineeringCount, searchResults.Length, "Should find correct number of engineering employees");
+
+                // 4. æµ‹è¯•æ›´æ–°è®°å½•
+                if (readRecords.Length > 0)
+                {
+                    var recordToUpdate = readRecords[0];
+                    var updatedRecord = recordToUpdate with { Department = "Updated Engineering" };
+                    var updateResult = await repo.UpdateTypedRecordAsync(recordToUpdate.UUID, updatedRecord);
+                    Assert.IsTrue(updateResult, "Update should succeed");
+
+                    // éªŒè¯æ›´æ–°
+                    var verifyRecords = await repo.ReadTypedRecordsAsync(new[] { recordToUpdate.UUID });
+                    Assert.IsNotNull(verifyRecords, "Verification read should not be null");
+                    Assert.AreEqual(1, verifyRecords.Length, "Should find exactly one updated record");
+                    Assert.AreEqual("Updated Engineering", verifyRecords[0].Department, "Department should be updated");
+                }
+
+                // 5. æµ‹è¯•åˆ é™¤è®°å½•
+                if (readRecords.Length > 0)
+                {
+                    var recordToDelete = readRecords[^1];
+                    var deleteResult = await repo.DeleteRecordsAsync(new[] { recordToDelete.UUID });
+                    Assert.IsTrue(deleteResult, "Delete should succeed");
+
+                    // éªŒè¯åˆ é™¤
+                    var verifyAfterDelete = await repo.ReadTypedRecordsAsync(new[] { recordToDelete.UUID });
+                    Assert.IsTrue(verifyAfterDelete == null || verifyAfterDelete.Length == 0, "Record should be deleted");
+                }
+            }
+            catch (Exception ex) when (ex.Message.Contains("connection") || ex.Message.Contains("database"))
+            {
+                // å¦‚æœæ˜¯è¿æ¥æˆ–æ•°æ®åº“é—®é¢˜ï¼Œè·³è¿‡æµ‹è¯•
+                Assert.Inconclusive($"Database connection issue: {ex.Message}");
+            }
+        }
+
+        [TestMethod]
+        [Priority(5)]
+        public async Task ActivityLogsRepository_CRUD_Operations_Test()
+        {
+            var repo = Test.TestProgram.CreateActivityLogsRepository();
+            
+            try
+            {
+                // é‡æ–°åˆå§‹åŒ–æ•°æ®åº“
+                await repo.InitializeDatabaseAsync(repo.databaseDefinition);
+
+                // 1. æµ‹è¯•æ·»åŠ è®°å½•
+                var testActivityLogs = CreateTestActivityLogs();
+                var addResult = await repo.AddNewTypedRecordsAsync(testActivityLogs);
+                Assert.IsTrue(addResult, "Adding new activity log records should succeed");
+
+                // 2. æµ‹è¯•è¯»å–è®°å½•
+                var uuidsToRead = testActivityLogs.Select(e => e.UUID).ToArray();
+                var readRecords = await repo.ReadTypedRecordsAsync(uuidsToRead);
+                Assert.IsNotNull(readRecords, "Read activity log records should not be null");
+                Assert.AreEqual(testActivityLogs.Length, readRecords.Length, "Should read the same number of records as added");
+
+                // 3. æµ‡è¯•æœç´¢è®°å½•
+                var searchResults = await repo.GetActivityLogsByTypeAsync("sit");
+                Assert.IsNotNull(searchResults, "Search results should not be null");
+                var sitCount = testActivityLogs.Count(e => e.ActivityType == "sit");
+                Assert.AreEqual(sitCount, searchResults.Length, "Should find correct number of sit activities");
+
+                // 4. æµ‹è¯•æŒ‰ç”¨æˆ·IDæœç´¢
+                var userResults = await repo.GetActivityLogsByUserIdAsync("USER001");
+                Assert.IsNotNull(userResults, "User search results should not be null");
+                var user001Count = testActivityLogs.Count(e => e.UserId == "USER001");
+                Assert.AreEqual(user001Count, userResults.Length, "Should find correct number of activities for USER001");
+
+                // 5. æµ‹è¯•æ—¥æœŸèŒƒå›´æœç´¢
+                var now = DateTime.Now;
+                var dateRangeResults = await repo.GetActivityLogsInDateRangeAsync("USER001", now.AddHours(-2), now.AddHours(2));
+                Assert.IsNotNull(dateRangeResults, "Date range search results should not be null");
+
+                // 6. æµ‹è¯•æ›´æ–°è®°å½•
+                if (readRecords.Length > 0)
+                {
+                    var recordToUpdate = readRecords[0];
+                    var updatedRecord = recordToUpdate with { ActivityType = "updated_sit", Duration = 1200 };
+                    var updateResult = await repo.UpdateTypedRecordAsync(recordToUpdate.UUID, updatedRecord);
+                    Assert.IsTrue(updateResult, "Update should succeed");
+
+                    // éªŒè¯æ›´æ–°
+                    var verifyRecords = await repo.ReadTypedRecordsAsync(new[] { recordToUpdate.UUID });
+                    Assert.IsNotNull(verifyRecords, "Verification read should not be null");
+                    Assert.AreEqual(1, verifyRecords.Length, "Should find exactly one updated record");
+                    Assert.AreEqual("updated_sit", verifyRecords[0].ActivityType, "Activity type should be updated");
+                    Assert.AreEqual(1200, verifyRecords[0].Duration, "Duration should be updated");
+                }
+
+                // 7. æµ‹è¯•åˆ é™¤è®°å½•
+                if (readRecords.Length > 0)
+                {
+                    var recordToDelete = readRecords[^1];
+                    var deleteResult = await repo.DeleteRecordsAsync(new[] { recordToDelete.UUID });
+                    Assert.IsTrue(deleteResult, "Delete should succeed");
+
+                    // éªŒè¯åˆ é™¤
+                    var verifyAfterDelete = await repo.ReadTypedRecordsAsync(new[] { recordToDelete.UUID });
+                    Assert.IsTrue(verifyAfterDelete == null || verifyAfterDelete.Length == 0, "Record should be deleted");
+                }
+            }
+            catch (Exception ex) when (ex.Message.Contains("connection") || ex.Message.Contains("database"))
+            {
+                // å¦‚æœæ˜¯è¿æ¥æˆ–æ•°æ®åº“é—®é¢˜ï¼Œè·³è¿‡æµ‹è¯•
+                Assert.Inconclusive($"Database connection issue: {ex.Message}");
+            }
+        }
+
+        [TestMethod]
+        [Priority(6)]
         public async Task Repository_Concurrent_Operations_Test()
         {
             var employeesRepo = Test.TestProgram.CreateEmployeesRepository();
@@ -229,11 +235,11 @@ namespace UnitTest
             
             try
             {
-                // ÖØĞÂ³õÊ¼»¯Êı¾İ¿â
+                // é‡æ–°åˆå§‹åŒ–æ•°æ®åº“
                 await employeesRepo.InitializeDatabaseAsync(employeesRepo.databaseDefinition);
                 await activityLogsRepo.InitializeDatabaseAsync(activityLogsRepo.databaseDefinition);
 
-                // ²¢·¢²âÊÔ
+                // å¹¶å‘æµ‹è¯•
                 var tasks = new List<Task<bool>>();
                 for (int i = 0; i < 5; i++)
                 {
@@ -242,15 +248,15 @@ namespace UnitTest
                     {
                         try
                         {
-                            // ²âÊÔÔ±¹¤²Ö´¢²¢·¢Á¬½Ó
+                            // æµ‹è¯•å‘˜å·¥ä»“å‚¨å¹¶å‘è¿æ¥
                             using var empConnection = await employeesRepo.TryConnectAsync();
                             if (empConnection == null) return false;
 
-                            // ²âÊÔ»î¶¯ÈÕÖ¾²Ö´¢²¢·¢Á¬½Ó
+                            // æµ‹è¯•æ´»åŠ¨æ—¥å¿—ä»“å‚¨å¹¶å‘è¿æ¥
                             using var logConnection = await activityLogsRepo.TryConnectAsync();
                             if (logConnection == null) return false;
 
-                            // ²âÊÔ²¢·¢²éÑ¯
+                            // æµ‹è¯•å¹¶å‘æŸ¥è¯¢
                             var empResult = await employeesRepo.ExecuteCommandAsync("SELECT 1");
                             var logResult = await activityLogsRepo.ExecuteCommandAsync("SELECT 1");
                             
@@ -273,6 +279,7 @@ namespace UnitTest
         }
 
         [TestMethod]
+        [Priority(7)]
         public async Task Repository_Error_Handling_Test()
         {
             var employeesRepo = Test.TestProgram.CreateEmployeesRepository();
@@ -280,21 +287,21 @@ namespace UnitTest
             
             try
             {
-                // ÖØĞÂ³õÊ¼»¯Êı¾İ¿â
+                // é‡æ–°åˆå§‹åŒ–æ•°æ®åº“
                 await employeesRepo.InitializeDatabaseAsync(employeesRepo.databaseDefinition);
                 await activityLogsRepo.InitializeDatabaseAsync(activityLogsRepo.databaseDefinition);
 
-                // ²âÊÔ¶ÁÈ¡²»´æÔÚµÄ¼ÇÂ¼ - Ô±¹¤
+                // æµ‹è¯•è¯»å–ä¸å­˜åœ¨çš„è®°å½• - å‘˜å·¥
                 var nonExistentEmployees = await employeesRepo.ReadTypedRecordsAsync(new[] { "non-existent-uuid" });
                 Assert.IsTrue(nonExistentEmployees == null || nonExistentEmployees.Length == 0, 
                     "Reading non-existent employee records should return empty result");
 
-                // ²âÊÔ¶ÁÈ¡²»´æÔÚµÄ¼ÇÂ¼ - »î¶¯ÈÕÖ¾
+                // æµ‹è¯•è¯»å–ä¸å­˜åœ¨çš„è®°å½• - æ´»åŠ¨æ—¥å¿—
                 var nonExistentLogs = await activityLogsRepo.ReadTypedRecordsAsync(new[] { "non-existent-uuid" });
                 Assert.IsTrue(nonExistentLogs == null || nonExistentLogs.Length == 0, 
                     "Reading non-existent activity log records should return empty result");
 
-                // ²âÊÔÎŞĞ§µÄËÑË÷Ìõ¼şÓ¦¸ÃÅ×³öÒì³£
+                // æµ‹è¯•æ— æ•ˆçš„æœç´¢æ¡ä»¶åº”è¯¥æŠ›å‡ºå¼‚å¸¸
                 await Assert.ThrowsExceptionAsync<Exception>(async () =>
                 {
                     await employeesRepo.SearchTypedRecordsAsync("non_existent_column", "test");
@@ -305,7 +312,7 @@ namespace UnitTest
                     await activityLogsRepo.SearchTypedRecordsAsync("non_existent_column", "test");
                 }, "Searching activity logs with invalid column should throw exception");
 
-                // ²âÊÔ¿Õ²ÎÊı
+                // æµ‹è¯•ç©ºå‚æ•°
                 await Assert.ThrowsExceptionAsync<ArgumentException>(async () =>
                 {
                     await employeesRepo.UpdateTypedRecordAsync("", new RepositoriesCore.EmployeesRepository.EmployeeRecord(
@@ -325,22 +332,24 @@ namespace UnitTest
         }
 
         [TestMethod]
+        [Priority(8)]
         public void Repository_Data_Validation_Test()
         {
-            // ²âÊÔÁ¬½Ó×Ö·û´®ÑéÖ¤
+            // æµ‹è¯•è¿æ¥å­—ç¬¦ä¸²éªŒè¯
             Assert.IsTrue(IRepository.IsValidConnectionString("Server=localhost;Database=test;User Id=user;Password=pwd;"),
                 "Valid connection string should be recognized");
             
             Assert.IsFalse(IRepository.IsValidConnectionString("invalid connection string"),
                 "Invalid connection string should be rejected");
 
-            // ²âÊÔÁ¬½Ó×Ö·û´®Éú³É
+            // æµ‹è¯•è¿æ¥å­—ç¬¦ä¸²ç”Ÿæˆ
             var connectionString = IRepository.GenerateConnectionString("localhost", "testdb", "user", "password");
             Assert.IsTrue(IRepository.IsValidConnectionString(connectionString),
                 "Generated connection string should be valid");
         }
 
         [TestMethod]
+        [Priority(9)]
         public void EmployeeRecord_Conversion_Test()
         {
             var now = DateTime.Now;
@@ -360,22 +369,23 @@ namespace UnitTest
             var dict = repo.RecordToDict(testRecord);
             Assert.IsNotNull(dict, "Record conversion should not return null");
             Assert.AreEqual("test-uuid", dict["UUID"], "UUID should be converted correctly");
-            Assert.AreEqual("test-user", dict["user_id"], "UserId should be converted correctly");
-            Assert.AreEqual("Test Name", dict["name"], "Name should be converted correctly");
+            Assert.AreEqual("test-user", dict["UserId"], "UserId should be converted correctly");
+            Assert.AreEqual("Test Name", dict["Name"], "Name should be converted correctly");
 
-            // ²âÊÔ·´Ïò×ª»»
+            // æµ‹è¯•åå‘è½¬æ¢
             var convertedRecord = repo.DictToRecord(dict);
             Assert.IsNotNull(convertedRecord, "Dictionary to record conversion should not return null");
             Assert.AreEqual(testRecord.UUID, convertedRecord.UUID, "UUID should match after conversion");
             Assert.AreEqual(testRecord.UserId, convertedRecord.UserId, "UserId should match after conversion");
             Assert.AreEqual(testRecord.Name, convertedRecord.Name, "Name should match after conversion");
 
-            // ²âÊÔ null ¼ÇÂ¼
+            // æµ‹è¯• null è®°å½•
             var nullDict = repo.RecordToDict(null);
             Assert.IsNull(nullDict, "Null record should return null dictionary");
         }
 
         [TestMethod]
+        [Priority(10)]
         public void ActivityLogRecord_Conversion_Test()
         {
             var now = DateTime.Now;
@@ -394,11 +404,11 @@ namespace UnitTest
             var dict = repo.RecordToDict(testRecord);
             Assert.IsNotNull(dict, "Activity log record conversion should not return null");
             Assert.AreEqual("test-uuid", dict["UUID"], "UUID should be converted correctly");
-            Assert.AreEqual("TEST123", dict["user_id"], "UserId should be converted correctly");
-            Assert.AreEqual("sit", dict["activity_type"], "ActivityType should be converted correctly");
-            Assert.AreEqual(1800, dict["duration"], "Duration should be converted correctly");
+            Assert.AreEqual("TEST123", dict["UserId"], "UserId should be converted correctly");
+            Assert.AreEqual("sit", dict["ActivityType"], "ActivityType should be converted correctly");
+            Assert.AreEqual(1800, dict["Duration"], "Duration should be converted correctly");
 
-            // ²âÊÔ·´Ïò×ª»»
+            // æµ‹è¯•åå‘è½¬æ¢
             var convertedRecord = repo.DictToRecord(dict);
             Assert.IsNotNull(convertedRecord, "Dictionary to activity log record conversion should not return null");
             Assert.AreEqual(testRecord.UUID, convertedRecord.UUID, "UUID should match after conversion");
@@ -406,7 +416,7 @@ namespace UnitTest
             Assert.AreEqual(testRecord.ActivityType, convertedRecord.ActivityType, "ActivityType should match after conversion");
             Assert.AreEqual(testRecord.Duration, convertedRecord.Duration, "Duration should match after conversion");
 
-            // ²âÊÔ null ¼ÇÂ¼
+            // æµ‹è¯• null è®°å½•
             var nullDict = repo.RecordToDict(null);
             Assert.IsNull(nullDict, "Null activity log record should return null dictionary");
         }

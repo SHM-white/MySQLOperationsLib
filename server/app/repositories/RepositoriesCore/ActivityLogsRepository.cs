@@ -15,7 +15,7 @@ namespace RepositoriesCore
 
         public override ActivityLogRecord? DictToRecord(Dictionary<string, object?>? dict)
         {
-            return dict.DictToActivityLogsRecord();
+            return dict.DictToRecord<ActivityLogRecord>();
         }
 
         // Additional convenience methods specific to activity logs
@@ -78,9 +78,9 @@ namespace RepositoriesCore
         // Activity log record definition - LogId changed to string
         public record ActivityLogRecord(
             string UUID,
-            string LogId,
             string UserId,
             string ActivityType,    
+            string DetailInformation,
             DateTime StartTime,
             DateTime EndTime,
             int Duration,
@@ -90,14 +90,14 @@ namespace RepositoriesCore
         // Database definition based on the provided table structure - log_id changed to string
         public static readonly IEnumerable<ColumnDefinition> DatabaseDefinition =
         [
-            new (Name:"UUID", Type:DbColumnType.Guid, IsPrimaryKey:true, IsNullable:false, Comment:"记录uuid，主键"),
-            new (Name:"log_id", Type:DbColumnType.String, Length:50, IsNullable:false, IsIndexed:true, Comment:"记录ID"),
-            new (Name:"user_id", Type:DbColumnType.String, Length:50, IsNullable:false, IsIndexed:true, Comment:"员工ID，外键关联employees表"),
-            new (Name:"activity_type", Type:DbColumnType.String, Length:20, IsNullable:false, IsIndexed:true, Comment:"活动类型(sit/stand/walk/meeting)"),
-            new (Name:"start_time", Type:DbColumnType.DateTime, IsNullable:false, IsIndexed:true, Comment:"活动开始时间"),
-            new (Name:"end_time", Type:DbColumnType.DateTime, IsNullable:false, Comment:"活动结束时间"),
-            new (Name:"duration", Type:DbColumnType.Int32, IsNullable:false, Comment:"活动持续时间(秒)"),
-            new (Name:"created_at", Type:DbColumnType.DateTime, IsNullable:false, DefaultValue:"CURRENT_TIMESTAMP", Comment:"创建时间")
+            new (Name:"UUID", Type:DbColumnType.Guid, IsPrimaryKey:true, IsNullable:false, IsUnique:true, Comment:"记录uuid，主键"),
+            new (Name:"UserId", Type:DbColumnType.String, Length:50, IsNullable:false, IsIndexed:true, Comment:"员工ID，外键关联employees表"),
+            new (Name:"ActivityType", Type:DbColumnType.String, Length:20, IsNullable:false, IsIndexed:true, Comment:"活动类型"),
+            new (Name:"DetailInformation", Type:DbColumnType.Json, DefaultValue:"{}", Comment:"活动详情信息(JSON格式)"),
+            new (Name:"StartTime", Type:DbColumnType.DateTime, IsNullable:false, IsIndexed:true, Comment:"活动开始时间"),
+            new (Name:"EndTime", Type:DbColumnType.DateTime, IsNullable:false, Comment:"活动结束时间"),
+            new (Name:"Duration", Type:DbColumnType.Int32, IsNullable:false, DefaultValue:"0", Comment:"活动持续时间(秒)"),
+            new (Name:"CreatedAt", Type:DbColumnType.DateTime, IsNullable:false, DefaultValue:"CURRENT_TIMESTAMP", IsIndexed:true, Comment:"创建时间")
         ];
     }
 }
